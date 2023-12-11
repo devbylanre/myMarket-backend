@@ -10,7 +10,11 @@ export interface UserTypes {
   isVerified: boolean;
   contact: {
     email: string;
-    mobileNumber: string;
+    mobile: {
+      country: string;
+      countryCode: number;
+      number: number;
+    };
   };
   billing: {
     state: string;
@@ -44,7 +48,11 @@ const userSchema = new Schema<UserTypes>({
   password: { type: String, required: true },
   contact: {
     email: { type: String, required: true, unique: true },
-    mobileNumber: { type: String, default: '' },
+    mobile: {
+      country: { type: String, default: '' },
+      countryCode: { type: Number, default: '' },
+      number: { type: Number, default: '' },
+    },
   },
   billing: {
     state: { type: String, default: '' },

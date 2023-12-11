@@ -52,6 +52,57 @@ export class UserValidation extends ValidationUtil {
     ];
   }
 
+  public paramID() {
+    return [this.isParamObjectID('id', 'Invalid user ID')];
+  }
+
+  public verifyToken() {
+    return [
+      this.isParamObjectID('id', 'Invalid user ID'),
+      this.isLength(
+        this.isNotEmpty('key', 'Provide your OTP key'),
+        { min: 6 },
+        'Key requires at least 6 characters'
+      ),
+    ];
+  }
+
+  public resetPassword() {
+    return [
+      this.isParamObjectID('id', 'Invalid user ID'),
+      this.isString(
+        this.isNotEmpty('oldPassword', 'Provide your old password'),
+        'Old password requires strings'
+      ),
+      this.isStrongPassword(
+        this.isNotEmpty('newPassword', 'Provide your new password'),
+        'Use a combination of letters, numbers, and special characters to form a strong password'
+      ),
+    ];
+  }
+
+  public changeEmail() {
+    return [
+      this.isParamObjectID('id', 'Invalid user ID'),
+      this.isEmail(
+        this.isNotEmpty('email', 'Provide your email address'),
+        'Provide a valid email address'
+      ),
+    ];
+  }
+
+  public changeMobile() {
+    return [
+      this.isParamObjectID('id', 'Invalid user ID'),
+      this.isString(
+        this.isNotEmpty('mobile.country', 'Provide your country'),
+        'Country must be a valid string'
+      ),
+      this.isNumber('mobile.countyCode', 'Provide your country code'),
+      this.isNumber('mobile.number', 'Provide your mobile number'),
+    ];
+  }
+
   public updateUser() {
     return [
       this.isParamObjectID('id', 'Invalid user ID'),
