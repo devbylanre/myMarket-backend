@@ -1,245 +1,337 @@
 import mongoose, { Types } from 'mongoose';
-import { User, UserTypes } from '../models/user.model';
+import { User } from '../models/user.model';
 import { validationResult } from 'express-validator';
 import { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import { config } from '../config';
 import { NotificationController } from './notification.controller';
-
-interface ApiResponse<T = unknown> {
-  state: string;
-  data?: T;
-  message?: any;
-  error?: {
-    code: number;
-    message: string;
-    details: any;
-  };
-}
+import { mailer } from '../utils/nodemailer.util';
+import path from 'path';
 
 const notification = new NotificationController();
 
-export class UserController {
-  private async find(query?: Record<string, any>) {
-    const result = query ? await User.find(query) : await User.find();
-    return result;
-  }
+interface PasswordUpdateType<T = 'update' | 'reset'> {
+  type: T;
+}
 
-  private async findOne(query: Record<string, any>) {
-    const result = await User.findOne(query);
-    return result;
-  }
+type PasswordUpdateSchema =
+  | (PasswordUpdateType<'update'> & {
+      password: {
+        old: string;
+        new: string;
+      };
+    })
+  | (PasswordUpdateType<'reset'> & { password: string });
 
-  private async findById(id: string) {
-    const result = await User.findById(id);
-    return result;
-  }
+interface ErrorResponse {
+  code: number;
+  message: string;
+  details: any;
+}
 
-  private async create(data: UserTypes) {
-    const result = await User.create(data);
-    return result;
-  }
+interface SuccessResponse<T> {
+  data: T;
+  message: any;
+}
 
-  private async update(id: string, data: Record<string, any>) {
-    const result = await User.findByIdAndUpdate(id, data, { new: true });
-    return result;
-  }
+interface ResponseState<S = 'error' | 'success'> {
+  state: S;
+}
 
-  private async delete(id: Types.ObjectId) {
-    const result = await User.findByIdAndDelete(id);
-    return result;
-  }
+type ApiResponse<T> =
+  | (ResponseState<'success'> & SuccessResponse<T>)
+  | (ResponseState<'error'> & { error: ErrorResponse });
 
-  private validateRoute(req: Request) {
-    const errors = validationResult(req);
-    return errors;
-  }
-
-  private createErrorResponse(
+const util = {
+  errorResponse: function <T>(
     code: number,
     message: string,
     details: any
-  ): ApiResponse {
+  ): ApiResponse<null> {
     return {
       state: 'error',
-      error: { code, message, details },
+      error: {
+        code: code,
+        message: message,
+        details: details,
+      },
     };
-  }
+  },
 
-  private createSuccessResponse<T>(data: T, message: string): ApiResponse {
+  successResponse: function <T>(data: T, message: string): ApiResponse<T> {
     return {
       state: 'success',
       data: data,
       message: message,
     };
-  }
+  },
 
-  private createToken(id: mongoose.Types.ObjectId) {
+  createToken: function (id: mongoose.Types.ObjectId) {
     return jwt.sign({ _id: id }, config.secret_key, { expiresIn: '24d' });
-  }
+  },
 
-  private hashPassword(data: string) {
+  decodeToken: function (token: string) {
+    return jwt.decode(token);
+  },
+
+  hashPassword: function (password: string) {
     const salt = bcrypt.genSaltSync(10);
-    return bcrypt.hashSync(data, salt);
-  }
+    return bcrypt.hashSync(password, salt);
+  },
 
-  private verifyPassword(data: string, encrypted: string) {
-    return bcrypt.compareSync(data, encrypted);
-  }
+  comparePassword: function (password: string, encrypted: string) {
+    return bcrypt.compareSync(password, encrypted);
+  },
 
-  private generateOTP(length: number) {
-    let token = '';
+  generateNumbers: function (length: number) {
+    let num = '';
 
     for (let i = 0; i < length; i++) {
-      const num = Math.floor(Math.random() * 10).toString();
-      token += num;
+      const random = Math.floor(Math.random() * 10);
+      num += random.toString();
     }
 
-    return token;
-  }
+    return num;
+  },
 
-  async createUser(req: Request, res: Response) {
+  generateHexString: function (length: number) {
+    return crypto.randomBytes(length).toString('hex');
+  },
+};
+
+//  controller
+
+export const controller = {
+  create: async (req: Request, res: Response) => {
     try {
       const data = req.body;
-      const errors = this.validateRoute(req);
+      const errors = validationResult(req);
 
       // check if there's any validation error
       if (!errors.isEmpty()) {
         return res
-          .status(422)
+          .status(400)
           .json(
-            this.createErrorResponse(422, 'Validation error', errors.array())
+            util.errorResponse(400, 'Request validation error', errors.array())
           );
       }
 
-      // find if email already exists
-      const userExists = await this.findOne({
-        'contact.email': data.contact.email,
+      // find user by email
+      const emailExists = await User.findOne({
+        email: data.email,
       });
 
-      if (userExists) {
+      // check is user already exists
+      if (emailExists) {
         return res
           .status(400)
           .json(
-            this.createErrorResponse(
+            util.errorResponse(
               400,
               'Email is already registered to another user',
-              data.contact.email
+              data.email
             )
           );
       }
 
-      // hash password
-      const hashPassword = this.hashPassword(data.password as string);
+      // generate verification token
+      const verificationToken = util.generateHexString(40);
 
       // create user
-      const user = await this.create({ ...data, password: hashPassword });
+      const user = await User.create({
+        ...data,
+        password: util.hashPassword(data.password as string),
+        'verification.token': verificationToken,
+      });
 
       await notification.createNotification({
         userId: user._id,
-        message: 'Welcome to the #1 marketplace',
-        activityType: 'user',
+        message: 'Welcome to myMarket',
+        activityType: 'registration',
+      });
+
+      // send an email to the user
+      const mail = await mailer.send({
+        to: data.email,
+        subject: 'Welcome to myMarket',
+        template: path.join(__dirname, '..', 'views', 'welcome.ejs'),
+        data: {
+          username: `${data.firstName} ${data.lastName}`,
+          subject: 'Welcome to myMarket',
+          verificationUrl: `http://localhost:3000/auth/verify/${verificationToken}`,
+        },
       });
 
       return res
         .status(200)
         .json(
-          this.createSuccessResponse(user, 'User registration successfully')
+          util.successResponse(
+            { user: user.email, mail: mail?.messageId },
+            'User registration successfully'
+          )
         );
     } catch (err: any) {
       return res
         .status(500)
         .json(
-          this.createErrorResponse(
+          util.errorResponse(
             500,
             'Unable to complete user registration',
             err.message
           )
         );
     }
-  }
+  },
 
-  async authUser(req: Request, res: Response) {
+  verify: async function (req: Request, res: Response) {
     try {
-      const { email, password } = req.body;
+      const { token } = req.params;
 
-      // check for field errors
-      const errors = this.validateRoute(req);
+      const errors = validationResult(req);
 
       if (!errors.isEmpty()) {
         return res
-          .status(422)
-          .json(
-            this.createErrorResponse(422, 'Validation error', errors.array())
-          );
+          .status(401)
+          .json(util.errorResponse(401, 'Request validation error', token));
       }
 
-      // find the user
-      const user = await this.findOne({ 'contact.email': email });
+      const user = await User.findOneAndUpdate(
+        { 'verification.token': token },
+        {
+          'verification.token': '',
+          'verification.isVerified': true,
+        }
+      );
 
       if (!user) {
         return res
           .status(400)
-          .json(this.createErrorResponse(400, 'User does not exist', email));
+          .json(util.errorResponse(400, 'Invalid verification token', token));
+      }
+
+      return res
+        .status(200)
+        .json(util.successResponse(token, 'User verification successful'));
+    } catch (error: any) {
+      return res
+        .status(500)
+        .json(
+          util.errorResponse(500, 'Invalid verification token', error.message)
+        );
+    }
+  },
+
+  authenticate: async function (req: Request, res: Response) {
+    try {
+      const auth = req.body;
+
+      const errors = validationResult(req);
+
+      // check if there's any validation error
+      if (!errors.isEmpty()) {
+        return res
+          .status(400)
+          .json(
+            util.errorResponse(400, 'Request validation error', errors.array())
+          );
+      }
+
+      // find the user
+      const user = await User.findOne({ email: auth.email });
+
+      // check if user does not exist
+      if (!user) {
+        return res
+          .status(400)
+          .json(util.errorResponse(400, 'User does not exist', auth.email));
+      }
+
+      // check if user is verified
+      if (!user.verification.isVerified) {
+        return res
+          .status(401)
+          .json(
+            util.errorResponse(
+              401,
+              'User is not verified, Check your email for verification link',
+              user.verification.isVerified
+            )
+          );
       }
 
       // verify password
-      const isPasswordMatch = this.verifyPassword(password, user.password);
+      const isPasswordMatch = util.comparePassword(
+        auth.password,
+        user.password
+      );
 
+      // check if password does not match
       if (!isPasswordMatch) {
         return res
           .status(400)
           .json(
-            this.createErrorResponse(400, 'Password does not match', password)
+            util.errorResponse(400, 'Password does not match', auth.password)
           );
       }
 
-      const token = this.createToken(user._id);
+      const token = util.createToken(user._id); // create a jwt token
+      const { exp } = util.decodeToken(token) as Record<string, any>;
 
-      return res
-        .status(200)
-        .json(
-          this.createSuccessResponse(
-            { user, token },
-            'User authentication successful'
-          )
-        );
+      const { password, otp, verification, ...data } = user.toObject();
+
+      return res.status(200).json(
+        util.successResponse(
+          {
+            ...data,
+            token: { id: token, exp },
+          },
+          'User authentication successful'
+        )
+      );
     } catch (err: any) {
       return res
         .status(500)
         .json(
-          this.createErrorResponse(
-            500,
-            'Unable to authenticate user',
-            err.message
-          )
+          util.errorResponse(500, 'Unable to authenticate user', err.message)
         );
     }
-  }
+  },
 
-  async updateUser(req: Request, res: Response) {
+  update: async function (req: Request, res: Response) {
     try {
       const { id } = req.params;
       const data = req.body;
 
-      const errors = this.validateRoute(req);
-
-      if (!errors.isEmpty()) {
+      if (!data || Object.keys(data).length < 1) {
         return res
-          .status(422)
+          .status(400)
           .json(
-            this.createErrorResponse(422, 'Validation error', errors.array())
+            util.errorResponse(400, 'No data provided', 'Invalid data provided')
           );
       }
 
-      const userExists = await this.findById(id as any);
+      const errors = validationResult(req);
 
+      // check if there's any validation error
+      if (!errors.isEmpty()) {
+        return res
+          .status(400)
+          .json(
+            util.errorResponse(400, 'Request validation error', errors.array())
+          );
+      }
+
+      // find user by id
+      const userExists = await User.findById(id as any);
+
+      // check if user does not exists
       if (!userExists) {
         return res
           .status(422)
           .json(
-            this.createErrorResponse(
+            util.errorResponse(
               422,
               'Cannot update a user that does not exist',
               id
@@ -247,307 +339,281 @@ export class UserController {
           );
       }
 
-      const result = await this.update(id, data);
+      // update user data
+      await User.findByIdAndUpdate(id, data);
 
       return res
         .status(200)
-        .json(this.createSuccessResponse(result, 'User updated successfully'));
+        .json(util.successResponse(data, 'User updated successfully'));
     } catch (err: any) {
       return res
         .status(500)
         .json(
-          this.createErrorResponse(
-            500,
-            'Unable to update user data',
-            err.message
-          )
+          util.errorResponse(500, 'Unable to update user data', err.message)
         );
     }
-  }
+  },
 
-  async fetchUser(req: Request, res: Response) {
+  fetch: async function (req: Request, res: Response) {
     try {
       const { id } = req.params;
 
-      const user = await this.findById(id);
+      const errors = validationResult(req);
 
-      if (!user) {
-        return res
-          .status(404)
-          .json(this.createErrorResponse(500, 'User not found', id));
-      }
-
-      const { password, ...userData } = user.toObject();
-
-      return res
-        .status(200)
-        .json(
-          this.createSuccessResponse(userData, 'User data fetched successfully')
-        );
-    } catch (err: any) {
-      return res
-        .status(500)
-        .json(
-          this.createErrorResponse(
-            500,
-            'Unable to fetch user data',
-            err.message
-          )
-        );
-    }
-  }
-
-  async generateToken(req: Request, res: Response) {
-    try {
-      const { id } = req.params;
-
-      const user = await this.findById(id);
-
-      if (!user) {
-        return res
-          .status(404)
-          .json(this.createErrorResponse(404, 'User not found', id));
-      }
-
-      const token = this.generateOTP(6);
-      const expirationTime = new Date().setTime(new Date().getTime() + 15000);
-
-      const result: any = await this.update(id, {
-        'token.key': token,
-        'token.expiration': expirationTime,
-      });
-
-      return res
-        .status(200)
-        .json(
-          this.createSuccessResponse(
-            result.token,
-            'Token generated successfully'
-          )
-        );
-    } catch (err: any) {
-      return res
-        .status(500)
-        .json(
-          this.createErrorResponse(500, 'Unable to generate toke', err.message)
-        );
-    }
-  }
-
-  async verifyToken(req: Request, res: Response) {
-    try {
-      const { id } = req.params;
-      const { key } = req.body;
-
-      const errors = this.validateRoute(req);
-
+      // check if there's any validation error
       if (!errors.isEmpty()) {
         return res
-          .status(422)
-          .json(
-            this.createErrorResponse(422, 'Validation failed', errors.array())
-          );
-      }
-
-      // find user
-      const user = await this.findById(id);
-
-      // check if user exists
-      if (!user) {
-        return res
-          .status(404)
-          .json(this.createErrorResponse(404, 'User not found', id));
-      }
-
-      // check if token exist
-      if (!user.token.key) {
-        return res
-          .status(400)
-          .json(this.createErrorResponse(400, 'No token found', id));
-      }
-
-      // check if the user token key matches the provided key
-      if (user.token.key !== key) {
-        return res
-          .status(400)
-          .json(this.createErrorResponse(400, 'Invalid token', key));
-      }
-
-      const currentTime = new Date().getTime();
-
-      // check if current time is greater than the token expiration time
-      if (currentTime > user.token.expiration) {
-        await this.update(id, { 'token.key': '', 'token.expiration': 0 });
-        return res
-          .status(400)
-          .json(this.createErrorResponse(400, 'Token has expired', id));
-      } else {
-        await this.update(id, { 'token.key': '', 'token.expiration': 0 }); //
-        return res
-          .status(200)
-          .json(
-            this.createSuccessResponse(
-              user.token,
-              'Token verification successful'
-            )
-          );
-      }
-    } catch (err: any) {
-      res
-        .status(500)
-        .json(
-          this.createErrorResponse(500, 'Unable to verify token', err.message)
-        );
-    }
-  }
-
-  async resetPassword(req: Request, res: Response) {
-    try {
-      const { id } = req.params;
-      const { oldPassword, newPassword } = req.body;
-
-      // field errors
-      const errors = this.validateRoute(req);
-
-      // check if field errors is not empty
-      if (!errors.isEmpty()) {
-        return res
-          .status(422)
-          .json(
-            this.createErrorResponse(
-              500,
-              'Field validation error',
-              errors.array()
-            )
-          );
-      }
-
-      // find user
-      const user = await this.findById(id);
-
-      // check if user was not found
-      if (!user) {
-        return res
-          .status(404)
-          .json(this.createErrorResponse(404, 'User not found', id));
-      }
-
-      const isPasswordMatch = this.verifyPassword(oldPassword, user.password);
-
-      // check if password does not match
-      if (!isPasswordMatch) {
-        return res
           .status(400)
           .json(
-            this.createErrorResponse(
-              400,
-              'Your password does not match',
-              oldPassword
-            )
+            util.errorResponse(400, 'Request validation error', errors.array())
           );
       }
 
-      // hash the new password
-      const hashPassword = this.hashPassword(newPassword);
-
-      // update the user password
-      const result = await this.update(id, { password: hashPassword });
-
-      return res
-        .status(200)
-        .json(
-          this.createSuccessResponse(result, 'Password updated successfully')
-        );
-    } catch (err: any) {
-      return res
-        .status(500)
-        .json(
-          this.createErrorResponse(
-            500,
-            'Unable to update password',
-            err.message
-          )
-        );
-    }
-  }
-
-  async changeEmail(req: Request, res: Response) {
-    try {
-      const { id } = req.params;
-      const { email } = req.body;
-
-      // field errors
-      const errors = this.validateRoute(req);
-
-      // check if field errors is not empty
-      if (!errors.isEmpty()) {
-        return res
-          .status(422)
-          .json(
-            this.createErrorResponse(
-              422,
-              'Field validation error',
-              errors.array()
-            )
-          );
-      }
-
-      // find user
-      const user = await this.findById(id);
+      // find user by id
+      const user = await User.findById(id);
 
       // check if user does not exist
       if (!user) {
         return res
           .status(404)
-          .json(this.createErrorResponse(404, 'User not found', id));
+          .json(util.errorResponse(500, 'User not found', id));
       }
 
-      // update or change user email address
-      const result = await this.update(id, { 'contact.email': email });
+      const { password, verification, otp, ...data } = user.toObject();
 
       return res
         .status(200)
-        .json(this.createSuccessResponse(result, 'Email updated successfully'));
-    } catch (err: any) {}
-  }
+        .json(util.successResponse(data, 'User data fetched successfully'));
+    } catch (err: any) {
+      return res
+        .status(500)
+        .json(
+          util.errorResponse(500, 'Unable to fetch user data', err.message)
+        );
+    }
+  },
 
-  async changeMobile(req: Request, res: Response) {
+  createOTP: async function (req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const { mobile } = req.body;
 
-      const errors = this.validateRoute(req);
+      const errors = validationResult(req);
 
+      // check if there's any validation error
       if (!errors.isEmpty()) {
         return res
-          .status(422)
+          .status(400)
           .json(
-            this.createErrorResponse(
-              422,
-              'Field validation error',
-              errors.array()
-            )
+            util.errorResponse(400, 'Request validation error', errors.array())
           );
       }
 
-      const user = await this.findById(id);
+      // find user by id
+      const user = await User.findById(id);
 
+      // check if user does not exist
       if (!user) {
         return res
-          .status(400)
-          .json(this.createErrorResponse(404, 'User not found', id));
+          .status(404)
+          .json(util.errorResponse(404, 'User not found', id));
       }
 
-      const result = await this.update(id, { 'contact.mobile': mobile });
+      // generate token
+      const code = util.generateNumbers(6);
+      const expiresAt = new Date().setTime(new Date().getTime() + 900000); // 15 minutes
+
+      // update user data
+      await User.findByIdAndUpdate(id, {
+        'otp.code': code,
+        'otp.expiresAt': expiresAt,
+      });
 
       return res
         .status(200)
         .json(
-          this.createSuccessResponse(
-            result,
-            'User mobile contact updated successfully'
+          util.successResponse(
+            { otp: { code, expiresAt } },
+            'OTP code generated successfully'
           )
         );
-    } catch {}
-  }
-}
+    } catch (err: any) {
+      return res
+        .status(500)
+        .json(util.errorResponse(500, 'Unable to generate toke', err.message));
+    }
+  },
+
+  verifyOTP: async function (req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const { code } = req.body;
+
+      const errors = validationResult(req);
+
+      // check if there's any validation error
+      if (!errors.isEmpty()) {
+        return res
+          .status(400)
+          .json(
+            util.errorResponse(400, 'Request validation error', errors.array())
+          );
+      }
+
+      // find user
+      const user = await User.findById(id);
+
+      // check if user exists
+      if (!user) {
+        return res
+          .status(404)
+          .json(util.errorResponse(404, 'User not found', id));
+      }
+
+      // check if token exist
+      if (!user.otp.code) {
+        return res
+          .status(400)
+          .json(util.errorResponse(400, 'No OTP code was found', id));
+      }
+
+      // check if the user token key matches the provided key
+      if (user.otp.code !== code) {
+        return res
+          .status(401)
+          .json(util.errorResponse(400, 'Invalid OTP code', code));
+      }
+
+      let result;
+
+      // check if current time is greater than the token expiration time
+      if (user.otp.expiresAt < Date.now()) {
+        result = await User.findByIdAndUpdate(id, {
+          'otp.key': '',
+          'otp.expiration': 0,
+        });
+        return res
+          .status(401)
+          .json(
+            util.errorResponse(400, 'One time password code has expired', id)
+          );
+      }
+
+      result = await User.findByIdAndUpdate(id, {
+        'otp.code': '',
+        'otp.expiresAt': 0,
+      });
+
+      return res
+        .status(200)
+        .json(
+          util.successResponse(
+            result?.otp,
+            'One time password verification successful'
+          )
+        );
+    } catch (err: any) {
+      res
+        .status(500)
+        .json(util.errorResponse(500, 'Unable to verify token', err.message));
+    }
+  },
+
+  verifyEmail: async function (req: Request, res: Response) {
+    try {
+      const { email } = req.body;
+
+      const errors = validationResult(req);
+
+      // check if there's any validation error
+      if (!errors.isEmpty()) {
+        return res
+          .status(400)
+          .json(
+            util.errorResponse(400, 'Request validation error', errors.array())
+          );
+      }
+
+      // find user by email
+      const user = await User.findOne({ email: email });
+
+      // check if user does not exist
+      if (!user) {
+        return res
+          .status(404)
+          .json(util.errorResponse(404, 'User not found', email));
+      }
+
+      const { verification, otp, password, ...data } = user.toObject();
+
+      return res
+        .status(200)
+        .json(util.successResponse(data, 'User verification successful'));
+    } catch (err: any) {
+      return res
+        .status(500)
+        .json(util.errorResponse(err, 'User verification failed', err.message));
+    }
+  },
+
+  updatePassword: async function (req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const { type, password }: PasswordUpdateSchema = req.body;
+
+      const user = await User.findById(id);
+
+      if (!user) {
+        return res
+          .status(404)
+          .json(util.errorResponse(404, 'User not found', id));
+      }
+
+      if (type === 'reset') {
+        await User.findByIdAndUpdate(user?._id, {
+          password: util.hashPassword(password),
+        });
+
+        return res
+          .status(200)
+          .json(util.successResponse(password, 'Password reset successfully'));
+      } else if (type === 'update') {
+        const passwordMatch = util.comparePassword(
+          password.old,
+          user?.password!
+        );
+
+        if (passwordMatch) {
+          await User.findOneAndUpdate(user?._id, {
+            password: util.hashPassword(password.new),
+          });
+        } else {
+          return res
+            .status(401)
+            .json(
+              util.errorResponse(
+                401,
+                'Your previous or old password was incorrect',
+                password.old
+              )
+            );
+        }
+      }
+
+      return res
+        .status(400)
+        .json(
+          util.errorResponse(
+            400,
+            'Specify the type of update',
+            type || 'No type specified'
+          )
+        );
+    } catch (error: any) {
+      return res
+        .status(500)
+        .json(
+          util.errorResponse(500, 'Unable to update password', error.message)
+        );
+    }
+  },
+};

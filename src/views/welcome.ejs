@@ -1,0 +1,70 @@
+<%- include('./layouts/header.ejs') %>
+<div class="container">
+  <div>
+    <h1 class="text-xl text-center"><%= subject %></h1>
+    <p class="mt-1 text-sm text-center">
+      Sell products | Buy products | Connect with real people
+    </p>
+  </div>
+
+  <div class="mt-10">
+    <h3 class="text-lg font-600">
+      Welcome onboard <span class="capitalize"><%= username %></span>
+    </h3>
+    <p class="mt-2 text-sm">
+      Welcome to myMarket! We're thrilled to have you on board. To get started,
+      please complete your registration by following the simple steps below:
+    </p>
+  </div>
+
+  <div class="mt-8">
+    <!-- verify your account -->
+    <div>
+      <h6 class="text-md font-500">Verify your email address</h6>
+      <p class="mt-2 text-sm">
+        Click on the link below to verify your email address and activate your
+        account:
+        <a
+          href="<%= verificationUrl %>"
+          target="_blank"
+          ><button class="h-8 px-2 rounded-md bg-primary btn btn--primary">
+            Verify my account
+          </button></a
+        >
+      </p>
+    </div>
+
+    <!-- complete your profile -->
+    <div class="mt-6">
+      <h6 class="text-md font-500">Complete Your Profile</h6>
+      <p class="mt-2 text-sm">
+        Once your email is verified, log in to your account and complete your
+        profile. This will help us tailor our services to your needs.
+      </p>
+    </div>
+
+    <!-- explore myMarket -->
+    <div class="mt-6">
+      <h6 class="text-md font-500">Explore myMarket</h6>
+      <p class="mt-2 text-sm">
+        Get to know our platform and explore the features that await you.
+        Whether it's [highlight a specific feature] or [mention another
+        feature], we're here to make your experience exceptional.
+      </p>
+
+      <p class="mt-2 text-sm">
+        If you have any questions or encounter any issues during the
+        registration process, feel free to reply to this email. Our support team
+        is always ready to assist you.
+      </p>
+
+      <p class="mt-2 text-sm">
+        Thank you for choosing myMarket
+        <span class="capitalize"><%= username %></span> We look forward to
+        serving you!
+      </p>
+    </div>
+  </div>
+</div>
+
+<%- include('./layouts/footer.ejs') %>

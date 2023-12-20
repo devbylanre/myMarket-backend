@@ -1,64 +1,62 @@
 import { Request, Response, Router } from 'express';
-import { UserController } from '../controllers/user.controller';
-import { UserValidation } from '../validations/user.validation';
-
-const controller = new UserController();
-const validate = new UserValidation();
+import { controller } from '../controllers/user.controller';
+import { validate } from '../validations/user.validation';
 
 const userRouter = Router();
 
-userRouter.post(
-  '/create',
-  validate.createUser(),
-  (req: Request, res: Response) => {
-    controller.createUser(req, res);
-  }
-);
+const routes = {
+  create: userRouter.post(
+    '/create',
+    validate.create,
+    (req: Request, res: Response) => controller.create(req, res)
+  ),
 
-userRouter.post('/auth', validate.authUser(), (req: Request, res: Response) =>
-  controller.authUser(req, res)
-);
+  verify: userRouter.put(
+    '/verify/token/:token',
+    (req: Request, res: Response) => controller.verify(req, res)
+  ),
 
-userRouter.put(
-  '/update/:id',
-  validate.updateUser(),
-  (req: Request, res: Response) => controller.updateUser(req, res)
-);
+  authenticate: userRouter.post(
+    '/auth',
+    validate.authenticate,
+    (req: Request, res: Response) => controller.authenticate(req, res)
+  ),
 
-userRouter.get(
-  '/fetch/:id',
-  validate.paramID(),
-  (req: Request, res: Response) => controller.fetchUser(req, res)
-);
+  update: userRouter.put(
+    '/update/:id',
+    validate.paramMongoID,
+    (req: Request, res: Response) => controller.update(req, res)
+  ),
 
-userRouter.put(
-  '/token/gen/:id',
-  validate.paramID(),
-  (req: Request, res: Response) => controller.generateToken(req, res)
-);
+  fetch: userRouter.get(
+    '/fetch/:id',
+    validate.paramMongoID,
+    (req: Request, res: Response) => controller.fetch(req, res)
+  ),
 
-userRouter.put(
-  '/token/verify/:id',
-  validate.verifyToken(),
-  (req: Request, res: Response) => controller.verifyToken(req, res)
-);
+  createOTP: userRouter.put(
+    '/create/otp/:id',
+    validate.paramMongoID,
+    (req: Request, res: Response) => controller.createOTP(req, res)
+  ),
 
-userRouter.put(
-  '/reset/password/:id',
-  validate.resetPassword(),
-  (req: Request, res: Response) => controller.resetPassword(req, res)
-);
+  verifyOTP: userRouter.get(
+    '/verify/otp/:id',
+    validate.verifyOTP,
+    (req: Request, res: Response) => controller.verifyOTP(req, res)
+  ),
 
-userRouter.put(
-  '/change/email/:id',
-  validate.changeEmail(),
-  (req: Request, res: Response) => controller.changeEmail(req, res)
-);
+  verifyEmail: userRouter.get(
+    '/verify/email',
+    validate.verifyEmail,
+    (req: Request, res: Response) => controller.verifyEmail(req, res)
+  ),
 
-userRouter.put(
-  '/change/mobile/:id',
-  validate.changeMobile(),
-  (req: Request, res: Response) => controller.changeMobile(req, res)
-);
+  updatePassword: userRouter.put(
+    '/update/password/:id',
+    validate.paramMongoID,
+    (req: Request, res: Response) => controller.updatePassword(req, res)
+  ),
+};
 
 export default userRouter;
