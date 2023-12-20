@@ -1,8 +1,8 @@
 import { Request, Response } from 'express';
 import { Notification, NotificationTypes } from '../models/notification.model';
 
-export class NotificationController {
-  async createNotification(data: NotificationTypes) {
+export const notification = {
+  create: async function (data: NotificationTypes) {
     try {
       const notification = new Notification(data);
 
@@ -10,9 +10,9 @@ export class NotificationController {
     } catch (err) {
       console.log('Error creating notification document', err);
     }
-  }
+  },
 
-  async readNotification(req: Request, res: Response) {
+  read: async function (req: Request, res: Response) {
     try {
       const { id } = req.params;
 
@@ -26,9 +26,9 @@ export class NotificationController {
     } catch (err) {
       return res.status(500).json({ error: err });
     }
-  }
+  },
 
-  async fetchNotification(req: Request, res: Response) {
+  fetch: async function (req: Request, res: Response) {
     try {
       const { userId } = req.params;
 
@@ -38,5 +38,5 @@ export class NotificationController {
     } catch (err) {
       res.status(500).json({ error: err });
     }
-  }
-}
+  },
+};

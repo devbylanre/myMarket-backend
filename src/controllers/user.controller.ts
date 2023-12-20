@@ -6,11 +6,9 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { config } from '../config';
-import { NotificationController } from './notification.controller';
+import { notification } from './notification.controller';
 import { mailer } from '../utils/nodemailer.util';
 import path from 'path';
-
-const notification = new NotificationController();
 
 interface PasswordUpdateType<T = 'update' | 'reset'> {
   type: T;
@@ -146,7 +144,7 @@ export const controller = {
         'verification.token': verificationToken,
       });
 
-      await notification.createNotification({
+      await notification.create({
         userId: user._id,
         message: 'Welcome to myMarket',
         activityType: 'registration',
