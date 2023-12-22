@@ -1,6 +1,6 @@
-import mongoose, { Schema, Types } from 'mongoose';
+import mongoose, { Schema, Document, Types } from 'mongoose';
 
-export interface UserTypes {
+export interface IUser extends Document {
   isSeller: boolean;
   balance: number;
   firstName: string;
@@ -34,7 +34,10 @@ export interface UserTypes {
     code: string;
     expiresAt: number;
   };
-  social: string[];
+  accounts: {
+    platform: string;
+    url: string;
+  }[];
   savedProducts: Types.ObjectId[];
   verification: {
     token: string;
@@ -42,7 +45,7 @@ export interface UserTypes {
   };
 }
 
-const userSchema = new Schema<UserTypes>({
+const userSchema = new Schema<IUser>({
   isSeller: { type: Boolean, default: false },
   balance: { type: Number, default: 0.0 },
   firstName: { type: String, required: true },
@@ -80,8 +83,11 @@ const userSchema = new Schema<UserTypes>({
     code: { type: String, default: '' },
     expiresAt: { type: Number, default: 0 },
   },
-  social: [{ type: String, default: [] }],
+  accounts: [
+    { platform: { type: String }, url: { type: String }, default: [] },
+    { _id: false },
+  ],
   savedProducts: [{ type: Schema.Types.ObjectId, default: [] }],
 });
 
-export const User = mongoose.model<UserTypes>('user', userSchema);
+export const User = mongoose.model<IUser>('user', userSchema);

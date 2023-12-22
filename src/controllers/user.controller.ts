@@ -10,19 +10,6 @@ import { notification } from './notification.controller';
 import { mailer } from '../utils/nodemailer.util';
 import path from 'path';
 
-interface PasswordUpdateType<T = 'update' | 'reset'> {
-  type: T;
-}
-
-type PasswordUpdateSchema =
-  | (PasswordUpdateType<'update'> & {
-      password: {
-        old: string;
-        new: string;
-      };
-    })
-  | (PasswordUpdateType<'reset'> & { password: string });
-
 interface ErrorResponse {
   code: number;
   message: string;
@@ -553,64 +540,75 @@ export const controller = {
     }
   },
 
-  updatePassword: async function (req: Request, res: Response) {
+  changePassword: async function (req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const { type, password }: PasswordUpdateSchema = req.body;
+      const { password } = req.body;
 
       const user = await User.findById(id);
 
       if (!user) {
         return res
           .status(404)
-          .json(util.errorResponse(404, 'User not found', id));
+          .json(util.errorResponse(404, 'User not found', 'Invalid user ID'));
       }
 
-      if (type === 'reset') {
-        await User.findByIdAndUpdate(user?._id, {
-          password: util.hashPassword(password),
-        });
+      const isMatch = util.comparePassword(password.old, user.password);
 
+      if (!isMatch) {
         return res
-          .status(200)
-          .json(util.successResponse(password, 'Password reset successfully'));
-      } else if (type === 'update') {
-        const passwordMatch = util.comparePassword(
-          password.old,
-          user?.password!
-        );
-
-        if (passwordMatch) {
-          await User.findOneAndUpdate(user?._id, {
-            password: util.hashPassword(password.new),
-          });
-        } else {
-          return res
-            .status(401)
-            .json(
-              util.errorResponse(
-                401,
-                'Your previous or old password was incorrect',
-                password.old
-              )
-            );
-        }
+          .status(401)
+          .json(
+            util.errorResponse(
+              401,
+              'Your previous password is incorrect',
+              password.old
+            )
+          );
       }
+
+      await User.findByIdAndUpdate(user._id, {
+        password: util.hashPassword(password.new),
+      });
 
       return res
         .status(400)
-        .json(
-          util.errorResponse(
-            400,
-            'Specify the type of update',
-            type || 'No type specified'
-          )
-        );
+        .json(util.successResponse(password.old, 'Password update successful'));
     } catch (error: any) {
       return res
         .status(500)
         .json(
           util.errorResponse(500, 'Unable to update password', error.message)
+        );
+    }
+  },
+
+  changeEmail: async function (req: Request, res: Response) {
+    try {
+      const { email, password } = req.params;
+
+      const user = await User.findOne({ email: email });
+
+      if (!user) {
+        return res
+          .status(404)
+          .json(util.errorResponse(404, 'User not found', 'Invalid user ID'));
+      }
+
+      await User.findByIdAndUpdate(user._id, { email: email });
+
+      return res
+        .status(200)
+        .json(util.successResponse(email, 'Email updated successfully'));
+    } catch (error: any) {
+      return res
+        .status(500)
+        .json(
+          util.errorResponse(
+            500,
+            'Unable to update user email address',
+            error.message
+          )
         );
     }
   },

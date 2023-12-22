@@ -52,10 +52,15 @@ const routes = {
     (req: Request, res: Response) => controller.verifyEmail(req, res)
   ),
 
-  updatePassword: userRouter.put(
-    '/update/password/:id',
+  changePassword: userRouter.put(
+    '/change/password/:id',
     validate.paramMongoID,
-    (req: Request, res: Response) => controller.updatePassword(req, res)
+    (req: Request, res: Response) => controller.changePassword(req, res)
+  ),
+
+  changeEmail: userRouter.put(
+    '/change/password',
+    (req: Request, res: Response) => controller.changeEmail(req, res)
   ),
 };
 
