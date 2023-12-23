@@ -80,4 +80,33 @@ export const validate = {
       .isEmail()
       .withMessage('Provide a valid email address e.g team@google.com'),
   ],
+
+  changePassword: [
+    body('password.old')
+      .trim()
+      .not()
+      .isEmpty()
+      .withMessage('Provide your previous password'),
+    body('password.new')
+      .trim()
+      .isStrongPassword()
+      .withMessage(
+        'Provide a password with at least one uppercase, lowercase, number, and special characters'
+      ),
+  ],
+
+  changeEmail: [
+    body('email')
+      .trim()
+      .not()
+      .isEmpty()
+      .withMessage('Provide your email address')
+      .isEmail()
+      .withMessage('Provide your email address'),
+    body('password')
+      .trim()
+      .not()
+      .isEmpty()
+      .withMessage('Provide your previous password'),
+  ],
 };

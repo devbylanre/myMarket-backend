@@ -43,6 +43,10 @@ export interface IUser extends Document {
     token: string;
     isVerified: boolean;
   };
+  photo: {
+    url: string;
+    name: string;
+  };
 }
 
 const userSchema = new Schema<IUser>({
@@ -71,7 +75,7 @@ const userSchema = new Schema<IUser>({
   store: {
     name: { type: String, default: '' },
     description: { type: String, default: '' },
-    followers: [{ type: Schema.Types.ObjectId, default: [] }],
+    followers: [{ type: Schema.Types.ObjectId }],
     location: {
       country: { type: String, default: 'Nigeria' },
       state: { type: String, default: '' },
@@ -84,10 +88,14 @@ const userSchema = new Schema<IUser>({
     expiresAt: { type: Number, default: 0 },
   },
   accounts: [
-    { platform: { type: String }, url: { type: String }, default: [] },
+    { platform: { type: String }, url: { type: String } },
     { _id: false },
   ],
-  savedProducts: [{ type: Schema.Types.ObjectId, default: [] }],
+  savedProducts: [{ type: Schema.Types.ObjectId }],
+  photo: {
+    url: { type: String, default: '' },
+    name: { type: String, default: '' },
+  },
 });
 
 export const User = mongoose.model<IUser>('user', userSchema);

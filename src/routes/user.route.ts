@@ -1,8 +1,21 @@
 import { Request, Response, Router } from 'express';
 import { controller } from '../controllers/user.controller';
 import { validate } from '../validations/user.validation';
+import { fileUtil } from '../utils/file.util';
+import multer from 'multer';
 
 const userRouter = Router();
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 5 * 1024 * 1024,
+    files: 1,
+  },
+  fileFilter(req, file, callback) {
+    fileUtil.isImage(file, callback);
+  },
+});
 
 const routes = {
   create: userRouter.post(
@@ -53,14 +66,22 @@ const routes = {
   ),
 
   changePassword: userRouter.put(
-    '/change/password/:id',
-    validate.paramMongoID,
+    '/change/password/',
+    validate.changePassword,
     (req: Request, res: Response) => controller.changePassword(req, res)
   ),
 
   changeEmail: userRouter.put(
-    '/change/password',
+    '/change/email/:id',
+    validate.changeEmail,
     (req: Request, res: Response) => controller.changeEmail(req, res)
+  ),
+
+  uploadPhoto: userRouter.put(
+    '/upload/photo/:id',
+    validate.paramMongoID,
+    upload.single('photo'),
+    (req: Request, res: Response) => controller.uploadPhoto(req, res)
   ),
 };
 

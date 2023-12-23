@@ -1,7 +1,7 @@
-import mongoose, { Types } from 'mongoose';
+import mongoose from 'mongoose';
 import { User } from '../models/user.model';
 import { validationResult } from 'express-validator';
-import { Request, Response } from 'express';
+import { Request, Response, response } from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
@@ -9,6 +9,20 @@ import { config } from '../config';
 import { notification } from './notification.controller';
 import { mailer } from '../utils/nodemailer.util';
 import path from 'path';
+
+// firebase
+import { initializeApp } from 'firebase/app';
+import {
+  deleteObject,
+  getDownloadURL,
+  getStorage,
+  ref,
+  uploadBytes,
+} from 'firebase/storage';
+import { handleResponse } from '../utils/res.util';
+
+const firebaseApp = initializeApp(config.firebase);
+const storage = getStorage(firebaseApp);
 
 interface ErrorResponse {
   code: number;
@@ -30,29 +44,6 @@ type ApiResponse<T> =
   | (ResponseState<'error'> & { error: ErrorResponse });
 
 const util = {
-  errorResponse: function <T>(
-    code: number,
-    message: string,
-    details: any
-  ): ApiResponse<null> {
-    return {
-      state: 'error',
-      error: {
-        code: code,
-        message: message,
-        details: details,
-      },
-    };
-  },
-
-  successResponse: function <T>(data: T, message: string): ApiResponse<T> {
-    return {
-      state: 'success',
-      data: data,
-      message: message,
-    };
-  },
-
   createToken: function (id: mongoose.Types.ObjectId) {
     return jwt.sign({ _id: id }, config.secret_key, { expiresIn: '24d' });
   },
@@ -96,11 +87,11 @@ export const controller = {
 
       // check if there's any validation error
       if (!errors.isEmpty()) {
-        return res
-          .status(400)
-          .json(
-            util.errorResponse(400, 'Request validation error', errors.array())
-          );
+        return handleResponse.error({
+          res: res,
+          status: 401,
+          message: errors.array(),
+        });
       }
 
       // find user by email
@@ -110,15 +101,11 @@ export const controller = {
 
       // check is user already exists
       if (emailExists) {
-        return res
-          .status(400)
-          .json(
-            util.errorResponse(
-              400,
-              'Email is already registered to another user',
-              data.email
-            )
-          );
+        return handleResponse.error({
+          res: res,
+          status: 400,
+          message: 'Email is already registered to another account',
+        });
       }
 
       // generate verification token
@@ -149,24 +136,18 @@ export const controller = {
         },
       });
 
-      return res
-        .status(200)
-        .json(
-          util.successResponse(
-            { user: user.email, mail: mail?.messageId },
-            'User registration successfully'
-          )
-        );
-    } catch (err: any) {
-      return res
-        .status(500)
-        .json(
-          util.errorResponse(
-            500,
-            'Unable to complete user registration',
-            err.message
-          )
-        );
+      return handleResponse.success({
+        res: response,
+        status: 200,
+        message: 'User registration successful',
+        data: { email: data.email },
+      });
+    } catch (error: any) {
+      return handleResponse.error({
+        res: res,
+        status: 500,
+        message: error.message,
+      });
     }
   },
 
@@ -177,9 +158,13 @@ export const controller = {
       const errors = validationResult(req);
 
       if (!errors.isEmpty()) {
-        return res
-          .status(401)
-          .json(util.errorResponse(401, 'Request validation error', token));
+        if (!errors.isEmpty()) {
+          return handleResponse.error({
+            res: res,
+            status: 401,
+            message: errors.array(),
+          });
+        }
       }
 
       const user = await User.findOneAndUpdate(
@@ -191,20 +176,25 @@ export const controller = {
       );
 
       if (!user) {
-        return res
-          .status(400)
-          .json(util.errorResponse(400, 'Invalid verification token', token));
+        return handleResponse.error({
+          res: res,
+          status: 401,
+          message: 'User not found',
+        });
       }
 
-      return res
-        .status(200)
-        .json(util.successResponse(token, 'User verification successful'));
+      return handleResponse.success({
+        res: res,
+        status: 200,
+        message: 'User verification successful',
+        data: { email: user.email },
+      });
     } catch (error: any) {
-      return res
-        .status(500)
-        .json(
-          util.errorResponse(500, 'Invalid verification token', error.message)
-        );
+      return handleResponse.error({
+        res: res,
+        status: 500,
+        message: error.message,
+      });
     }
   },
 
@@ -216,11 +206,11 @@ export const controller = {
 
       // check if there's any validation error
       if (!errors.isEmpty()) {
-        return res
-          .status(400)
-          .json(
-            util.errorResponse(400, 'Request validation error', errors.array())
-          );
+        return handleResponse.error({
+          res: res,
+          status: 401,
+          message: errors.array(),
+        });
       }
 
       // find the user
@@ -228,22 +218,21 @@ export const controller = {
 
       // check if user does not exist
       if (!user) {
-        return res
-          .status(400)
-          .json(util.errorResponse(400, 'User does not exist', auth.email));
+        return handleResponse.error({
+          res: res,
+          status: 401,
+          message: 'User does not exist',
+        });
       }
 
       // check if user is verified
       if (!user.verification.isVerified) {
-        return res
-          .status(401)
-          .json(
-            util.errorResponse(
-              401,
-              'User is not verified, Check your email for verification link',
-              user.verification.isVerified
-            )
-          );
+        return handleResponse.error({
+          res: res,
+          status: 401,
+          message:
+            'User is not verified, Check your email for verification link',
+        });
       }
 
       // verify password
@@ -254,11 +243,11 @@ export const controller = {
 
       // check if password does not match
       if (!isPasswordMatch) {
-        return res
-          .status(400)
-          .json(
-            util.errorResponse(400, 'Password does not match', auth.password)
-          );
+        return handleResponse.error({
+          res: res,
+          status: 401,
+          message: 'Password does not match',
+        });
       }
 
       const token = util.createToken(user._id); // create a jwt token
@@ -266,21 +255,18 @@ export const controller = {
 
       const { password, otp, verification, ...data } = user.toObject();
 
-      return res.status(200).json(
-        util.successResponse(
-          {
-            ...data,
-            token: { id: token, exp },
-          },
-          'User authentication successful'
-        )
-      );
-    } catch (err: any) {
-      return res
-        .status(500)
-        .json(
-          util.errorResponse(500, 'Unable to authenticate user', err.message)
-        );
+      return handleResponse.success({
+        res: res,
+        status: 200,
+        message: 'User authentication successful',
+        data: { ...data },
+      });
+    } catch (error: any) {
+      return handleResponse.error({
+        res: res,
+        status: 500,
+        message: error.message,
+      });
     }
   },
 
@@ -290,22 +276,11 @@ export const controller = {
       const data = req.body;
 
       if (!data || Object.keys(data).length < 1) {
-        return res
-          .status(400)
-          .json(
-            util.errorResponse(400, 'No data provided', 'Invalid data provided')
-          );
-      }
-
-      const errors = validationResult(req);
-
-      // check if there's any validation error
-      if (!errors.isEmpty()) {
-        return res
-          .status(400)
-          .json(
-            util.errorResponse(400, 'Request validation error', errors.array())
-          );
+        return handleResponse.error({
+          res: res,
+          status: 400,
+          message: 'No data to update',
+        });
       }
 
       // find user by id
@@ -313,29 +288,28 @@ export const controller = {
 
       // check if user does not exists
       if (!userExists) {
-        return res
-          .status(422)
-          .json(
-            util.errorResponse(
-              422,
-              'Cannot update a user that does not exist',
-              id
-            )
-          );
+        return handleResponse.error({
+          res: res,
+          status: 422,
+          message: 'Cannot update user that does not exist',
+        });
       }
 
       // update user data
       await User.findByIdAndUpdate(id, data);
 
-      return res
-        .status(200)
-        .json(util.successResponse(data, 'User updated successfully'));
-    } catch (err: any) {
-      return res
-        .status(500)
-        .json(
-          util.errorResponse(500, 'Unable to update user data', err.message)
-        );
+      return handleResponse.success({
+        res: res,
+        status: 200,
+        message: 'User data updated successfully',
+        data: { ...data },
+      });
+    } catch (error: any) {
+      return handleResponse.error({
+        res: res,
+        status: 500,
+        message: 'Unable to update user data',
+      });
     }
   },
 
@@ -347,11 +321,13 @@ export const controller = {
 
       // check if there's any validation error
       if (!errors.isEmpty()) {
-        return res
-          .status(400)
-          .json(
-            util.errorResponse(400, 'Request validation error', errors.array())
-          );
+        if (!errors.isEmpty()) {
+          return handleResponse.error({
+            res: res,
+            status: 401,
+            message: errors.array(),
+          });
+        }
       }
 
       // find user by id
@@ -359,22 +335,27 @@ export const controller = {
 
       // check if user does not exist
       if (!user) {
-        return res
-          .status(404)
-          .json(util.errorResponse(500, 'User not found', id));
+        return handleResponse.error({
+          res: res,
+          status: 404,
+          message: 'User not found',
+        });
       }
 
       const { password, verification, otp, ...data } = user.toObject();
 
-      return res
-        .status(200)
-        .json(util.successResponse(data, 'User data fetched successfully'));
-    } catch (err: any) {
-      return res
-        .status(500)
-        .json(
-          util.errorResponse(500, 'Unable to fetch user data', err.message)
-        );
+      return handleResponse.success({
+        res: res,
+        status: 200,
+        message: 'User data fetched successfully',
+        data: { ...data },
+      });
+    } catch (error: any) {
+      return handleResponse.error({
+        res: res,
+        status: 500,
+        message: error.message,
+      });
     }
   },
 
@@ -386,11 +367,11 @@ export const controller = {
 
       // check if there's any validation error
       if (!errors.isEmpty()) {
-        return res
-          .status(400)
-          .json(
-            util.errorResponse(400, 'Request validation error', errors.array())
-          );
+        return handleResponse.error({
+          res: res,
+          status: 401,
+          message: errors.array(),
+        });
       }
 
       // find user by id
@@ -398,9 +379,11 @@ export const controller = {
 
       // check if user does not exist
       if (!user) {
-        return res
-          .status(404)
-          .json(util.errorResponse(404, 'User not found', id));
+        return handleResponse.error({
+          res: res,
+          status: 401,
+          message: 'User does not exist',
+        });
       }
 
       // generate token
@@ -413,18 +396,18 @@ export const controller = {
         'otp.expiresAt': expiresAt,
       });
 
-      return res
-        .status(200)
-        .json(
-          util.successResponse(
-            { otp: { code, expiresAt } },
-            'OTP code generated successfully'
-          )
-        );
-    } catch (err: any) {
-      return res
-        .status(500)
-        .json(util.errorResponse(500, 'Unable to generate toke', err.message));
+      return handleResponse.success({
+        res: res,
+        status: 200,
+        message: 'OTP generated successfully',
+        data: { otp: { code, expiresAt } },
+      });
+    } catch (error: any) {
+      return handleResponse.error({
+        res: res,
+        status: 500,
+        message: error.message,
+      });
     }
   },
 
@@ -437,11 +420,11 @@ export const controller = {
 
       // check if there's any validation error
       if (!errors.isEmpty()) {
-        return res
-          .status(400)
-          .json(
-            util.errorResponse(400, 'Request validation error', errors.array())
-          );
+        return handleResponse.error({
+          res: res,
+          status: 401,
+          message: errors.array(),
+        });
       }
 
       // find user
@@ -449,23 +432,29 @@ export const controller = {
 
       // check if user exists
       if (!user) {
-        return res
-          .status(404)
-          .json(util.errorResponse(404, 'User not found', id));
+        return handleResponse.error({
+          res: res,
+          status: 401,
+          message: 'User does not exist',
+        });
       }
 
       // check if token exist
       if (!user.otp.code) {
-        return res
-          .status(400)
-          .json(util.errorResponse(400, 'No OTP code was found', id));
+        return handleResponse.error({
+          res: res,
+          status: 401,
+          message: 'No One Time Password was found',
+        });
       }
 
       // check if the user token key matches the provided key
       if (user.otp.code !== code) {
-        return res
-          .status(401)
-          .json(util.errorResponse(400, 'Invalid OTP code', code));
+        return handleResponse.error({
+          res: res,
+          status: 400,
+          message: 'Invalid One Time Password',
+        });
       }
 
       let result;
@@ -476,11 +465,11 @@ export const controller = {
           'otp.key': '',
           'otp.expiration': 0,
         });
-        return res
-          .status(401)
-          .json(
-            util.errorResponse(400, 'One time password code has expired', id)
-          );
+        return handleResponse.error({
+          res: res,
+          status: 400,
+          message: 'One Time Password has expired',
+        });
       }
 
       result = await User.findByIdAndUpdate(id, {
@@ -488,18 +477,18 @@ export const controller = {
         'otp.expiresAt': 0,
       });
 
-      return res
-        .status(200)
-        .json(
-          util.successResponse(
-            result?.otp,
-            'One time password verification successful'
-          )
-        );
-    } catch (err: any) {
-      res
-        .status(500)
-        .json(util.errorResponse(500, 'Unable to verify token', err.message));
+      return handleResponse.success({
+        res: res,
+        status: 200,
+        message: 'One Time Password has been verified',
+        data: null,
+      });
+    } catch (error: any) {
+      return handleResponse.error({
+        res: res,
+        status: 500,
+        message: error.message,
+      });
     }
   },
 
@@ -511,11 +500,11 @@ export const controller = {
 
       // check if there's any validation error
       if (!errors.isEmpty()) {
-        return res
-          .status(400)
-          .json(
-            util.errorResponse(400, 'Request validation error', errors.array())
-          );
+        return handleResponse.error({
+          res: res,
+          status: 401,
+          message: errors.array(),
+        });
       }
 
       // find user by email
@@ -523,93 +512,202 @@ export const controller = {
 
       // check if user does not exist
       if (!user) {
-        return res
-          .status(404)
-          .json(util.errorResponse(404, 'User not found', email));
+        return handleResponse.error({
+          res: res,
+          status: 401,
+          message: 'User does not exist',
+        });
       }
 
       const { verification, otp, password, ...data } = user.toObject();
 
-      return res
-        .status(200)
-        .json(util.successResponse(data, 'User verification successful'));
-    } catch (err: any) {
-      return res
-        .status(500)
-        .json(util.errorResponse(err, 'User verification failed', err.message));
+      return handleResponse.success({
+        res: res,
+        status: 200,
+        message: 'User verification successful',
+        data: { ...data },
+      });
+    } catch (error: any) {
+      return handleResponse.error({
+        res: res,
+        status: 500,
+        message: error.message,
+      });
     }
   },
 
   changePassword: async function (req: Request, res: Response) {
     try {
-      const { id } = req.params;
-      const { password } = req.body;
+      const { email, password } = req.body;
 
-      const user = await User.findById(id);
+      const errors = validationResult(req);
+
+      if (!errors.isEmpty()) {
+        return handleResponse.error({
+          res: res,
+          status: 401,
+          message: errors.array(),
+        });
+      }
+
+      const user = await User.findOne({ email: email });
 
       if (!user) {
-        return res
-          .status(404)
-          .json(util.errorResponse(404, 'User not found', 'Invalid user ID'));
+        return handleResponse.error({
+          res: res,
+          status: 400,
+          message: 'User does not exist',
+        });
       }
 
       const isMatch = util.comparePassword(password.old, user.password);
 
       if (!isMatch) {
-        return res
-          .status(401)
-          .json(
-            util.errorResponse(
-              401,
-              'Your previous password is incorrect',
-              password.old
-            )
-          );
+        return handleResponse.error({
+          res: res,
+          status: 401,
+          message: 'Your previous password is incorrect',
+        });
       }
 
       await User.findByIdAndUpdate(user._id, {
         password: util.hashPassword(password.new),
       });
 
-      return res
-        .status(400)
-        .json(util.successResponse(password.old, 'Password update successful'));
+      return handleResponse.success({
+        res: res,
+        status: 200,
+        message: 'Password updated successfully',
+        data: null,
+      });
     } catch (error: any) {
-      return res
-        .status(500)
-        .json(
-          util.errorResponse(500, 'Unable to update password', error.message)
-        );
+      return handleResponse.error({
+        res: res,
+        status: 500,
+        message: error.message,
+      });
     }
   },
 
   changeEmail: async function (req: Request, res: Response) {
     try {
-      const { email, password } = req.params;
+      const { email, password } = req.body;
+      const { id } = req.params;
 
-      const user = await User.findOne({ email: email });
+      const errors = validationResult(req);
+
+      if (!errors.isEmpty()) {
+        if (!errors.isEmpty()) {
+          return handleResponse.error({
+            res: res,
+            status: 401,
+            message: errors.array(),
+          });
+        }
+      }
+
+      const user = await User.findById(id);
 
       if (!user) {
-        return res
-          .status(404)
-          .json(util.errorResponse(404, 'User not found', 'Invalid user ID'));
+        return handleResponse.error({
+          res: res,
+          status: 401,
+          message: 'User does not exist',
+        });
+      }
+
+      const isMatch = util.comparePassword(password, user.password);
+
+      if (!isMatch) {
+        return handleResponse.error({
+          res: res,
+          status: 401,
+          message: 'Incorrect password',
+        });
       }
 
       await User.findByIdAndUpdate(user._id, { email: email });
 
-      return res
-        .status(200)
-        .json(util.successResponse(email, 'Email updated successfully'));
+      return handleResponse.success({
+        res: res,
+        status: 200,
+        message: 'Email changed successfully',
+        data: { email: email },
+      });
     } catch (error: any) {
-      return res
-        .status(500)
-        .json(
-          util.errorResponse(
-            500,
-            'Unable to update user email address',
-            error.message
-          )
-        );
+      return handleResponse.error({
+        res: res,
+        status: 500,
+        message: error.message,
+      });
+    }
+  },
+
+  uploadPhoto: async (req: Request, res: Response) => {
+    try {
+      const file = req.file;
+      const { id } = req.params;
+
+      const errors = validationResult(req);
+
+      if (!errors.isEmpty()) {
+        if (!errors.isEmpty()) {
+          return handleResponse.error({
+            res: res,
+            status: 401,
+            message: errors.array(),
+          });
+        }
+      }
+
+      if (!file) {
+        return handleResponse.error({
+          res: res,
+          status: 500,
+          message: 'No file specified',
+        });
+      }
+
+      const user = await User.findById(id);
+
+      if (!user) {
+        return handleResponse.error({
+          res: res,
+          status: 400,
+          message: 'User does not exist',
+        });
+      }
+
+      const encrypted =
+        user._id + '-' + Date.now() + path.extname(file.originalname);
+      const storageRef = ref(storage, `photos/${encrypted}`);
+
+      if (user.photo.name) {
+        const deleteRef = ref(storage, `/photos/${user.photo.name}`);
+        await deleteObject(deleteRef);
+      }
+
+      const snapshot = await uploadBytes(storageRef, file.buffer);
+      const url = await getDownloadURL(snapshot.ref);
+
+      const update = await User.findByIdAndUpdate(
+        user._id,
+        { photo: { url: url, name: encrypted } },
+        { new: true }
+      );
+
+      return handleResponse.success({
+        res: res,
+        status: 200,
+        message: 'Photo uploaded successfully',
+        data: { photo: { name: encrypted, url: url } },
+      });
+    } catch (error: any) {
+      return handleResponse.error({
+        res: res,
+        status: 500,
+        message: error.message,
+      });
     }
   },
 };
