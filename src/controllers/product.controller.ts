@@ -17,6 +17,7 @@ import {
 // config file
 import { config } from '../config';
 import path from 'path';
+import mongoose from 'mongoose';
 
 const firebaseApp = initializeApp(config.firebase);
 const storage = getStorage(firebaseApp);
@@ -141,6 +142,54 @@ export const controller = {
         status: 200,
         message: 'Product deleted successfully',
         data: { _id: product._id, title: product.title },
+      });
+    } catch (error: any) {
+      return handleResponse.error({
+        res: res,
+        status: 500,
+        message: error.message,
+      });
+    }
+  },
+
+  fetch: async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+
+      const product = await Product.aggregate([
+        {
+          $match: {
+            _id: new mongoose.Types.ObjectId(id),
+          },
+        },
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'sellerId',
+            foreignField: '_id',
+            as: 'seller',
+          },
+        },
+      ]);
+
+      if (!product || product.length === 0) {
+        return handleResponse.error({
+          res: res,
+          status: 404,
+          message: 'Product not found',
+        });
+      }
+
+      const seller = product[0].seller[0];
+      const { password, verification, ...sellerData } = seller;
+
+      const { seller: _, ...productData } = product[0];
+
+      return handleResponse.success({
+        res: res,
+        status: 200,
+        message: 'Product fetched successfully',
+        data: { ...productData, seller: { ...sellerData } },
       });
     } catch (error: any) {
       return handleResponse.error({

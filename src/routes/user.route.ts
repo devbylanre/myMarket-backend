@@ -47,6 +47,12 @@ const routes = {
     (req: Request, res: Response) => controller.fetch(req, res)
   ),
 
+  fetchProducts: userRouter.get(
+    '/fetch/products/:id',
+    validate.paramMongoID,
+    (req: Request, res: Response) => controller.fetchProducts(req, res)
+  ),
+
   createOTP: userRouter.put(
     '/create/otp/:id',
     validate.paramMongoID,

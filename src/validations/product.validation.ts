@@ -96,6 +96,7 @@ export const validate = {
 
   update: [
     helper.validateIsMongoId({
+      isParam: true,
       field: 'id',
       message: 'Provide a valid product ID',
     }),
@@ -103,6 +104,15 @@ export const validate = {
 
   delete: [
     helper.validateIsMongoId({
+      isParam: true,
+      field: 'id',
+      message: 'Provide a valid product ID',
+    }),
+  ],
+
+  fetch: [
+    helper.validateIsMongoId({
+      isParam: true,
       field: 'id',
       message: 'Provide a valid product ID',
     }),

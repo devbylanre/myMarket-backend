@@ -679,4 +679,43 @@ export const controller = {
       });
     }
   },
+
+  fetchProducts: async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+
+      const products = await User.aggregate([
+        { $match: { _id: new mongoose.Types.ObjectId(id) } },
+        {
+          $lookup: {
+            from: 'products',
+            localField: '_id',
+            foreignField: 'sellerId',
+            as: 'products',
+          },
+        },
+      ]);
+
+      if (!products || products.length === 0) {
+        return handleResponse.error({
+          res: res,
+          status: 404,
+          message: 'No products was found',
+        });
+      }
+
+      return handleResponse.success({
+        res: res,
+        status: 200,
+        message: 'Products found',
+        data: products[0].products,
+      });
+    } catch (error: any) {
+      return handleResponse.error({
+        res: res,
+        status: 500,
+        message: error.message,
+      });
+    }
+  },
 };

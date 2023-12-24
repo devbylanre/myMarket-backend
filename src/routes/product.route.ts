@@ -46,6 +46,13 @@ const routes = {
       controller.delete(req, res);
     }
   ),
+
+  fetch: productRouter.get(
+    '/fetch/:id',
+    auth.user,
+    validate.fetch,
+    (req: Request, res: Response) => controller.fetch(req, res)
+  ),
 };
 
 export default productRouter;
