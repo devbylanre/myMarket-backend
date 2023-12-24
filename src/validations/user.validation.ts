@@ -29,7 +29,7 @@ const helper = {
   },
 
   validatePassword: ({ field, msgPrefix }: IValidate) => {
-    body(field)
+    return body(field)
       .isStrongPassword()
       .withMessage(
         `Use a strong ${msgPrefix} containing at least one uppercase, lowercase, number and special character`
@@ -38,26 +38,26 @@ const helper = {
 
   validateMongoID: ({ field, msgPrefix, isParam = true }: IValidateMongoId) => {
     if (isParam) {
-      return param(field).isMongoId().withMessage(`Invalid ${msgPrefix} iD`);
+      return param(field).isMongoId().withMessage(`Invalid ${msgPrefix} ID`);
     }
+
+    return body(field).isMongoId().withMessage('Invalid ${msgPrefix} ID');
   },
 };
 
 export const validate = {
-  create: () => {
-    return [
-      helper.validateString({ field: 'firstName', msgPrefix: 'first name' }),
-      helper.validateString({ field: 'lastName', msgPrefix: 'last name' }),
-      helper.validateEmail({ field: 'email', msgPrefix: 'email address' }),
-      helper
-        .validateString({ field: 'bio', msgPrefix: 'bio' })
-        .isLength({ min: 100, max: 256 })
-        .withMessage(
-          'Biography require minimum of 100 and maximum of 256 characters'
-        ),
-      helper.validatePassword({ field: 'password', msgPrefix: 'password' }),
-    ];
-  },
+  create: [
+    helper.validateString({ field: 'firstName', msgPrefix: 'first name' }),
+    helper.validateString({ field: 'lastName', msgPrefix: 'last name' }),
+    helper.validateEmail({ field: 'email', msgPrefix: 'email address' }),
+    helper
+      .validateString({ field: 'bio', msgPrefix: 'bio' })
+      .isLength({ min: 100, max: 256 })
+      .withMessage(
+        'Biography require minimum of 100 and maximum of 256 characters'
+      ),
+    helper.validatePassword({ field: 'password', msgPrefix: 'password' }),
+  ],
 
   authenticate: () => {
     return [
@@ -76,19 +76,19 @@ export const validate = {
   },
 
   update: () => {
-    return [helper.validateMongoID({ field: 'id', msgPrefix: 'user Id' })];
+    return [helper.validateMongoID({ field: 'id', msgPrefix: 'user' })];
   },
 
   fetch: () => {
-    return [helper.validateMongoID({ field: 'id', msgPrefix: 'user Id' })];
+    return [helper.validateMongoID({ field: 'id', msgPrefix: 'user' })];
   },
 
   fetchProducts: () => {
-    return [helper.validateMongoID({ field: 'id', msgPrefix: 'user Id' })];
+    return [helper.validateMongoID({ field: 'id', msgPrefix: 'user' })];
   },
 
   createOTP: () => {
-    return [helper.validateMongoID({ field: 'id', msgPrefix: 'user Id' })];
+    return [helper.validateMongoID({ field: 'id', msgPrefix: 'user' })];
   },
 
   verifyOTP: [

@@ -7,17 +7,6 @@ interface IValidateField {
 }
 
 const helper = {
-  validateField: ({ field, maxLength, msgPrefix }: IValidateField) => {
-    return body(field)
-      .trim()
-      .notEmpty()
-      .withMessage(`${msgPrefix} is required`)
-      .isString()
-      .withMessage(`${msgPrefix} must be a string`)
-      .isLength({ max: maxLength })
-      .withMessage(`${msgPrefix} cannot extend ${maxLength} characters`);
-  },
-
   validateString: ({
     field,
     msgPrefix,
@@ -52,21 +41,27 @@ const helper = {
 
 export const validate = {
   create: [
-    helper.validateField({
-      field: 'title',
-      maxLength: 100,
-      msgPrefix: 'Product title',
-    }),
-    helper.validateField({
-      field: 'tagline',
-      maxLength: 256,
-      msgPrefix: 'Product tagline',
-    }),
-    helper.validateField({
-      field: 'description',
-      maxLength: 1024,
-      msgPrefix: 'Product description',
-    }),
+    helper
+      .validateString({
+        field: 'title',
+        msgPrefix: 'Product title',
+      })
+      .isLength({ max: 100 })
+      .withMessage('Product title cannot exceed 100 characters'),
+    helper
+      .validateString({
+        field: 'tagline',
+        msgPrefix: 'Product tagline',
+      })
+      .isLength({ max: 256 })
+      .withMessage('Product tagline cannot exceed 256 characters'),
+    helper
+      .validateString({
+        field: 'description',
+        msgPrefix: 'Product description',
+      })
+      .isLength({ max: 1024 })
+      .withMessage('Product title cannot exceed 1024 characters'),
     helper.validateString({
       field: 'brand',
       msgPrefix: 'Product brand',
