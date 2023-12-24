@@ -1,9 +1,10 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { config } from '../config';
+import { Types } from 'mongoose';
 
 export interface IAuthRequest extends Request {
-  user?: Record<string, any> | string | null;
+  user?: Types.ObjectId;
 }
 
 export const auth = {

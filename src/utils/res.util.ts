@@ -15,10 +15,12 @@ interface IErrorResponse {
 
 export const handleResponse = {
   success: ({ res, status, message, data }: ISuccessResponse) => {
-    return res.status(status).json({ message: message, data: data });
+    return res
+      .status(status)
+      .json({ status: 'success', message: message, data: data });
   },
 
   error: ({ res, status, message }: IErrorResponse) => {
-    return res.status(status).json({ message: message });
+    return res.status(status).json({ status: 'error', message: message });
   },
 };

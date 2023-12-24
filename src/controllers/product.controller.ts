@@ -25,7 +25,6 @@ export const controller = {
   create: async (req: IAuthRequest, res: Response) => {
     try {
       const data = req.body;
-      const id = req.user;
       const images = req.files as Express.Multer.File[];
 
       const errors = validationResult(req);
@@ -49,8 +48,9 @@ export const controller = {
       const uploadedImages: { name: string; url: string }[] = [];
 
       const uploadImages = images!.map(async (file: Express.Multer.File) => {
-        const encrypted =
-          file.filename + Date.now() + path.extname(file.originalname);
+        const encrypted = `${
+          path.parse(file.originalname).name
+        }-${Date.now().toString()}${path.extname(file.originalname)}`;
 
         const fileRef = ref(storage, `products/images/${encrypted}`);
         await uploadBytes(fileRef, file.buffer);
@@ -65,7 +65,7 @@ export const controller = {
       const product = await Product.create({
         ...data,
         images: uploadedImages,
-        seller: id,
+        sellerId: req.user,
       });
 
       return handleResponse.success({
@@ -83,10 +83,10 @@ export const controller = {
     }
   },
 
-  update: async (req: IAuthRequest, res: Response) => {
+  update: async (req: Request, res: Response) => {
     try {
       const data = req.body;
-      const id = req.user;
+      const { id } = req.params;
 
       const product = await Product.findByIdAndUpdate(id, data);
 
@@ -113,9 +113,9 @@ export const controller = {
     }
   },
 
-  deleteProduct: async (req: IAuthRequest, res: Response) => {
+  delete: async (req: Request, res: Response) => {
     try {
-      const id = req.user;
+      const { id } = req.params;
 
       const product = await Product.findById(id);
 
@@ -128,7 +128,7 @@ export const controller = {
       }
 
       const deleteImages = product.images.map(async (image) => {
-        const imageRef = ref(storage, `product/images/${image.name}`);
+        const imageRef = ref(storage, `products/images/${image.name}`);
         await deleteObject(imageRef);
       });
 

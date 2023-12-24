@@ -137,10 +137,10 @@ export const controller = {
       });
 
       return handleResponse.success({
-        res: response,
+        res: res,
         status: 200,
         message: 'User registration successful',
-        data: { email: data.email },
+        data: { email: data.email, mail: mail?.response },
       });
     } catch (error: any) {
       return handleResponse.error({
@@ -179,7 +179,7 @@ export const controller = {
         return handleResponse.error({
           res: res,
           status: 401,
-          message: 'User not found',
+          message: 'User does not exist',
         });
       }
 
@@ -259,7 +259,7 @@ export const controller = {
         res: res,
         status: 200,
         message: 'User authentication successful',
-        data: { ...data },
+        data: { ...data, token: { id: token, exp: exp } },
       });
     } catch (error: any) {
       return handleResponse.error({

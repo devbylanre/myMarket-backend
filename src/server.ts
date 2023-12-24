@@ -1,9 +1,12 @@
 import express from 'express';
 import { config } from './config';
 import mongoose from 'mongoose';
-import userRouter from './routes/user.route';
 import path from 'path';
 import cors from 'cors';
+
+// routers
+import productRouter from './routes/product.route';
+import userRouter from './routes/user.route';
 
 const app = express();
 
@@ -27,6 +30,7 @@ app.get('/', (req, res) => {
 
 app.use(express.json());
 app.use('/api/v1/user', userRouter);
+app.use('/api/v1/product', productRouter);
 
 mongoose
   .connect(config.mongoDBDriver + 'myMarket')

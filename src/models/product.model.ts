@@ -33,11 +33,12 @@ const productSchema = new Schema<IProduct>({
     {
       name: { type: String, required: true },
       url: { type: String, required: true },
+      _id: false,
     },
   ],
   tags: [{ type: String, required: true }],
   price: { type: Number, required: true },
-  discount: { type: Number, required: true },
+  discount: { type: Number, default: 0 },
   sellerId: { type: Schema.Types.ObjectId, required: true },
   reviews: [
     {
