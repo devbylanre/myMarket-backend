@@ -26,6 +26,7 @@ const routes = {
 
   verify: userRouter.put(
     '/verify/token/:token',
+    validate.verifyToken,
     (req: Request, res: Response) => controller.verify(req, res)
   ),
 
@@ -37,25 +38,25 @@ const routes = {
 
   update: userRouter.put(
     '/update/:id',
-    validate.paramMongoID,
+    validate.update,
     (req: Request, res: Response) => controller.update(req, res)
   ),
 
   fetch: userRouter.get(
     '/fetch/:id',
-    validate.paramMongoID,
+    validate.fetch,
     (req: Request, res: Response) => controller.fetch(req, res)
   ),
 
   fetchProducts: userRouter.get(
     '/fetch/products/:id',
-    validate.paramMongoID,
+    validate.fetchProducts,
     (req: Request, res: Response) => controller.fetchProducts(req, res)
   ),
 
   createOTP: userRouter.put(
     '/create/otp/:id',
-    validate.paramMongoID,
+    validate.createOTP,
     (req: Request, res: Response) => controller.createOTP(req, res)
   ),
 
@@ -85,7 +86,7 @@ const routes = {
 
   uploadPhoto: userRouter.put(
     '/upload/photo/:id',
-    validate.paramMongoID,
+    validate.uploadPhoto,
     upload.single('photo'),
     (req: Request, res: Response) => controller.uploadPhoto(req, res)
   ),

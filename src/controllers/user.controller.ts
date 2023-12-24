@@ -109,7 +109,7 @@ export const controller = {
         res: res,
         status: 201,
         message: 'User registration successful',
-        data: { email: data.email, mail: mail?.response },
+        data: null,
       });
     } catch (error: any) {
       return handleResponse.error({
@@ -156,7 +156,7 @@ export const controller = {
         res: res,
         status: 200,
         message: 'User verification successful',
-        data: { email: user.email },
+        data: null,
       });
     } catch (error: any) {
       return handleResponse.error({

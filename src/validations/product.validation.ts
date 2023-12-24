@@ -10,8 +10,7 @@ const helper = {
   validateField: ({ field, maxLength, msgPrefix }: IValidateField) => {
     return body(field)
       .trim()
-      .not()
-      .isEmpty()
+      .notEmpty()
       .withMessage(`${msgPrefix} is required`)
       .isString()
       .withMessage(`${msgPrefix} must be a string`)
@@ -28,8 +27,7 @@ const helper = {
   }) => {
     return body(field)
       .trim()
-      .not()
-      .isEmpty()
+      .notEmpty()
       .withMessage(`${msgPrefix} is required`)
       .isString()
       .withMessage(`${msgPrefix} must be a string`);
