@@ -122,7 +122,7 @@ export const controller = {
       if (!product) {
         return handleResponse.error({
           res: res,
-          status: 401,
+          status: 404,
           message: 'Product not found',
         });
       }

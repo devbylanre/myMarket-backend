@@ -24,34 +24,7 @@ import { handleResponse } from '../utils/res.util';
 const firebaseApp = initializeApp(config.firebase);
 const storage = getStorage(firebaseApp);
 
-interface ErrorResponse {
-  code: number;
-  message: string;
-  details: any;
-}
-
-interface SuccessResponse<T> {
-  data: T;
-  message: any;
-}
-
-interface ResponseState<S = 'error' | 'success'> {
-  state: S;
-}
-
-type ApiResponse<T> =
-  | (ResponseState<'success'> & SuccessResponse<T>)
-  | (ResponseState<'error'> & { error: ErrorResponse });
-
-const util = {
-  createToken: function (id: mongoose.Types.ObjectId) {
-    return jwt.sign({ _id: id }, config.secret_key, { expiresIn: '24d' });
-  },
-
-  decodeToken: function (token: string) {
-    return jwt.decode(token);
-  },
-
+const helper = {
   hashPassword: function (password: string) {
     const salt = bcrypt.genSaltSync(10);
     return bcrypt.hashSync(password, salt);
@@ -70,10 +43,6 @@ const util = {
     }
 
     return num;
-  },
-
-  generateHexString: function (length: number) {
-    return crypto.randomBytes(length).toString('hex');
   },
 };
 
@@ -103,18 +72,18 @@ export const controller = {
       if (emailExists) {
         return handleResponse.error({
           res: res,
-          status: 400,
+          status: 403,
           message: 'Email is already registered to another account',
         });
       }
 
       // generate verification token
-      const verificationToken = util.generateHexString(40);
+      const verificationToken = crypto.randomBytes(40).toString('hex');
 
       // create user
       const user = await User.create({
         ...data,
-        password: util.hashPassword(data.password as string),
+        password: helper.hashPassword(data.password as string),
         'verification.token': verificationToken,
       });
 
@@ -138,7 +107,7 @@ export const controller = {
 
       return handleResponse.success({
         res: res,
-        status: 200,
+        status: 201,
         message: 'User registration successful',
         data: { email: data.email, mail: mail?.response },
       });
@@ -178,7 +147,7 @@ export const controller = {
       if (!user) {
         return handleResponse.error({
           res: res,
-          status: 401,
+          status: 404,
           message: 'User does not exist',
         });
       }
@@ -220,7 +189,7 @@ export const controller = {
       if (!user) {
         return handleResponse.error({
           res: res,
-          status: 401,
+          status: 404,
           message: 'User does not exist',
         });
       }
@@ -229,14 +198,14 @@ export const controller = {
       if (!user.verification.isVerified) {
         return handleResponse.error({
           res: res,
-          status: 401,
+          status: 403,
           message:
             'User is not verified, Check your email for verification link',
         });
       }
 
       // verify password
-      const isPasswordMatch = util.comparePassword(
+      const isPasswordMatch = helper.comparePassword(
         auth.password,
         user.password
       );
@@ -250,8 +219,8 @@ export const controller = {
         });
       }
 
-      const token = util.createToken(user._id); // create a jwt token
-      const { exp } = util.decodeToken(token) as Record<string, any>;
+      const token = jwt.sign({ _id: user._id }, config.secret_key);
+      const { exp } = jwt.decode(token) as Record<string, any>;
 
       const { password, otp, verification, ...data } = user.toObject();
 
@@ -290,7 +259,7 @@ export const controller = {
       if (!userExists) {
         return handleResponse.error({
           res: res,
-          status: 422,
+          status: 404,
           message: 'Cannot update user that does not exist',
         });
       }
@@ -381,13 +350,13 @@ export const controller = {
       if (!user) {
         return handleResponse.error({
           res: res,
-          status: 401,
+          status: 404,
           message: 'User does not exist',
         });
       }
 
       // generate token
-      const code = util.generateNumbers(6);
+      const code = helper.generateNumbers(6);
       const expiresAt = new Date().setTime(new Date().getTime() + 900000); // 15 minutes
 
       // update user data
@@ -434,7 +403,7 @@ export const controller = {
       if (!user) {
         return handleResponse.error({
           res: res,
-          status: 401,
+          status: 404,
           message: 'User does not exist',
         });
       }
@@ -514,7 +483,7 @@ export const controller = {
       if (!user) {
         return handleResponse.error({
           res: res,
-          status: 401,
+          status: 404,
           message: 'User does not exist',
         });
       }
@@ -555,12 +524,12 @@ export const controller = {
       if (!user) {
         return handleResponse.error({
           res: res,
-          status: 400,
+          status: 404,
           message: 'User does not exist',
         });
       }
 
-      const isMatch = util.comparePassword(password.old, user.password);
+      const isMatch = helper.comparePassword(password.old, user.password);
 
       if (!isMatch) {
         return handleResponse.error({
@@ -571,7 +540,7 @@ export const controller = {
       }
 
       await User.findByIdAndUpdate(user._id, {
-        password: util.hashPassword(password.new),
+        password: helper.hashPassword(password.new),
       });
 
       return handleResponse.success({
@@ -611,12 +580,12 @@ export const controller = {
       if (!user) {
         return handleResponse.error({
           res: res,
-          status: 401,
+          status: 404,
           message: 'User does not exist',
         });
       }
 
-      const isMatch = util.comparePassword(password, user.password);
+      const isMatch = helper.comparePassword(password, user.password);
 
       if (!isMatch) {
         return handleResponse.error({
@@ -663,7 +632,7 @@ export const controller = {
       if (!file) {
         return handleResponse.error({
           res: res,
-          status: 500,
+          status: 400,
           message: 'No file specified',
         });
       }
@@ -673,7 +642,7 @@ export const controller = {
       if (!user) {
         return handleResponse.error({
           res: res,
-          status: 400,
+          status: 404,
           message: 'User does not exist',
         });
       }
