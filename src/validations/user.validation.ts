@@ -59,37 +59,25 @@ export const validate = {
     helper.validatePassword({ field: 'password', msgPrefix: 'password' }),
   ],
 
-  authenticate: () => {
-    return [
-      helper.validateEmail({ field: 'email', msgPrefix: 'email address' }),
-      helper.validatePassword({ field: 'password', msgPrefix: 'password' }),
-    ];
-  },
+  authenticate: [
+    helper.validateEmail({ field: 'email', msgPrefix: 'email address' }),
+    helper.validatePassword({ field: 'password', msgPrefix: 'password' }),
+  ],
 
-  verifyToken: () => {
-    return [
-      helper.validateMongoID({
-        field: 'token',
-        msgPrefix: 'verification token',
-      }),
-    ];
-  },
+  verifyToken: [
+    helper.validateMongoID({
+      field: 'token',
+      msgPrefix: 'verification token',
+    }),
+  ],
 
-  update: () => {
-    return [helper.validateMongoID({ field: 'id', msgPrefix: 'user' })];
-  },
+  update: [helper.validateMongoID({ field: 'id', msgPrefix: 'user' })],
 
-  fetch: () => {
-    return [helper.validateMongoID({ field: 'id', msgPrefix: 'user' })];
-  },
+  fetch: [helper.validateMongoID({ field: 'id', msgPrefix: 'user' })],
 
-  fetchProducts: () => {
-    return [helper.validateMongoID({ field: 'id', msgPrefix: 'user' })];
-  },
+  fetchProducts: [helper.validateMongoID({ field: 'id', msgPrefix: 'user' })],
 
-  createOTP: () => {
-    return [helper.validateMongoID({ field: 'id', msgPrefix: 'user' })];
-  },
+  createOTP: [helper.validateMongoID({ field: 'id', msgPrefix: 'user' })],
 
   verifyOTP: [
     param('id').isMongoId().withMessage('Invalid User ID'),
@@ -103,25 +91,21 @@ export const validate = {
     helper.validateEmail({ field: 'email', msgPrefix: 'email address' }),
   ],
 
-  changePassword: () => {
-    return [
-      helper.validateString({
-        field: 'password.old',
-        msgPrefix: 'old password',
-      }),
-      helper.validatePassword({
-        field: 'password.new',
-        msgPrefix: 'new password',
-      }),
-    ];
-  },
+  changePassword: [
+    helper.validateString({
+      field: 'password.old',
+      msgPrefix: 'old password',
+    }),
+    helper.validatePassword({
+      field: 'password.new',
+      msgPrefix: 'new password',
+    }),
+  ],
 
   changeEmail: [
     helper.validateEmail({ field: 'email', msgPrefix: 'email address' }),
     helper.validateString({ field: 'password', msgPrefix: 'password' }),
   ],
 
-  uploadPhoto: () => {
-    return [helper.validateMongoID({ field: 'id', msgPrefix: 'user Id' })];
-  },
+  uploadPhoto: [helper.validateMongoID({ field: 'id', msgPrefix: 'user Id' })],
 };

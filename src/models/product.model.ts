@@ -36,7 +36,6 @@ const productSchema = new Schema<IProduct>({
       _id: false,
     },
   ],
-  tags: [{ type: String, required: true }],
   price: { type: Number, required: true },
   discount: { type: Number, default: 0 },
   sellerId: { type: Schema.Types.ObjectId, required: true },

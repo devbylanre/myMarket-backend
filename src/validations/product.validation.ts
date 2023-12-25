@@ -61,7 +61,7 @@ export const validate = {
         msgPrefix: 'Product description',
       })
       .isLength({ max: 1024 })
-      .withMessage('Product title cannot exceed 1024 characters'),
+      .withMessage('Product description cannot exceed 1024 characters'),
     helper.validateString({
       field: 'brand',
       msgPrefix: 'Product brand',
@@ -74,17 +74,15 @@ export const validate = {
       field: 'category',
       msgPrefix: 'Product category',
     }),
-    body('tags.*')
-      .trim()
-      .not()
-      .isEmpty()
-      .withMessage('Include at least one product tag'),
     body('price').isInt().withMessage('Product price must be a number'),
     body('discount')
       .optional()
       .isInt()
       .withMessage('Product discount must be a number'),
-    body('sellerId').isMongoId().withMessage('Invalid user ID'),
+    helper.validateString({
+      field: 'seller ID',
+      msgPrefix: 'Seller ID',
+    }),
   ],
 
   update: [

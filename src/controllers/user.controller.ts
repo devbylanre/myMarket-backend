@@ -222,6 +222,8 @@ export const controller = {
       const token = jwt.sign({ _id: user._id }, config.secret_key);
       const { exp } = jwt.decode(token) as Record<string, any>;
 
+      console.log(exp);
+
       const { password, otp, verification, ...data } = user.toObject();
 
       return handleResponse.success({

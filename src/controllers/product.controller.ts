@@ -38,7 +38,7 @@ export const controller = {
         });
       }
 
-      if (!images || Array.from(images).length < 1) {
+      if (!images) {
         return handleResponse.error({
           res: res,
           status: 400,
