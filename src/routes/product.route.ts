@@ -9,20 +9,12 @@ const productRouter = Router();
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: {
-    fileSize: 5 * 1024 * 1024,
-    files: 5,
-  },
-  fileFilter: (req, file, cb) => {
-    fileUtil.isImage(file, cb);
-  },
 });
 
 const routes = {
   create: productRouter.post(
     '/create',
     auth.user,
-    validate.create,
     upload.array('images'),
     (req: Request, res: Response) => {
       controller.create(req, res);

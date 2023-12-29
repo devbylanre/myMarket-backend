@@ -28,15 +28,15 @@ export const controller = {
       const data = req.body;
       const images = req.files as Express.Multer.File[];
 
-      const errors = validationResult(req);
+      // const errors = validationResult(req);
 
-      if (!errors.isEmpty()) {
-        return handleResponse.error({
-          res: res,
-          status: 401,
-          message: errors.array(),
-        });
-      }
+      // if (!errors.isEmpty()) {
+      //   return handleResponse.error({
+      //     res: res,
+      //     status: 401,
+      //     message: errors.array(),
+      //   });
+      // }
 
       if (!images) {
         return handleResponse.error({
@@ -181,7 +181,7 @@ export const controller = {
       }
 
       const seller = product[0].seller[0];
-      const { password, verification, ...sellerData } = seller;
+      const { password, verification, otp, ...sellerData } = seller;
 
       const { seller: _, ...productData } = product[0];
 

@@ -25,16 +25,16 @@ const firebaseApp = initializeApp(config.firebase);
 const storage = getStorage(firebaseApp);
 
 const helper = {
-  hashPassword: function (password: string) {
+  hashPassword: (password: string) => {
     const salt = bcrypt.genSaltSync(10);
     return bcrypt.hashSync(password, salt);
   },
 
-  comparePassword: function (password: string, encrypted: string) {
+  comparePassword: (password: string, encrypted: string) => {
     return bcrypt.compareSync(password, encrypted);
   },
 
-  generateNumbers: function (length: number) {
+  generateNumbers: (length: number) => {
     let num = '';
 
     for (let i = 0; i < length; i++) {
@@ -88,13 +88,13 @@ export const controller = {
       });
 
       await notification.create({
-        userId: user._id,
-        message: 'Welcome to myMarket',
-        activityType: 'registration',
+        recipient: user._id,
+        content: 'Welcome to myMarket',
+        type: 'sign-up',
       });
 
       // send an email to the user
-      const mail = await mailer.send({
+      await mailer.send({
         to: data.email,
         subject: 'Welcome to myMarket',
         template: path.join(__dirname, '..', 'views', 'welcome.ejs'),
@@ -120,29 +120,11 @@ export const controller = {
     }
   },
 
-  verify: async function (req: Request, res: Response) {
+  emailVerification: async function (req: Request, res: Response) {
     try {
-      const { token } = req.params;
+      const { email, token } = req.body;
 
-      const errors = validationResult(req);
-
-      if (!errors.isEmpty()) {
-        if (!errors.isEmpty()) {
-          return handleResponse.error({
-            res: res,
-            status: 401,
-            message: errors.array(),
-          });
-        }
-      }
-
-      const user = await User.findOneAndUpdate(
-        { 'verification.token': token },
-        {
-          'verification.token': '',
-          'verification.isVerified': true,
-        }
-      );
+      const user = await User.findOne({ email: email });
 
       if (!user) {
         return handleResponse.error({
@@ -152,11 +134,68 @@ export const controller = {
         });
       }
 
+      if (user.verification.token !== token) {
+        return handleResponse.error({
+          res: res,
+          status: 401,
+          message: 'Invalid verification token',
+        });
+      }
+
+      await User.findByIdAndUpdate(user._id, {
+        'verification.token': '',
+        'verification.isVerified': true,
+      });
+
+      return handleResponse.success({
+        res: res,
+        status: 200,
+        message: 'Email verification successful',
+        data: null,
+      });
+    } catch (error: any) {
+      return handleResponse.error({
+        res: res,
+        status: 500,
+        message: error.message,
+      });
+    }
+  },
+
+  verification: async function (req: Request, res: Response) {
+    try {
+      const { email } = req.body;
+
+      const errors = validationResult(req);
+
+      // check if there's any validation error
+      if (!errors.isEmpty()) {
+        return handleResponse.error({
+          res: res,
+          status: 401,
+          message: errors.array(),
+        });
+      }
+
+      // find user by email
+      const user = await User.findOne({ email: email });
+
+      // check if user does not exist
+      if (!user) {
+        return handleResponse.error({
+          res: res,
+          status: 404,
+          message: 'User does not exist',
+        });
+      }
+
+      const { verification, otp, password, ...data } = user.toObject();
+
       return handleResponse.success({
         res: res,
         status: 200,
         message: 'User verification successful',
-        data: null,
+        data: { ...data },
       });
     } catch (error: any) {
       return handleResponse.error({
@@ -219,10 +258,10 @@ export const controller = {
         });
       }
 
-      const token = jwt.sign({ _id: user._id }, config.secret_key);
+      const token = jwt.sign({ _id: user._id }, config.secret_key, {
+        expiresIn: '24d',
+      });
       const { exp } = jwt.decode(token) as Record<string, any>;
-
-      console.log(exp);
 
       const { password, otp, verification, ...data } = user.toObject();
 
@@ -292,13 +331,11 @@ export const controller = {
 
       // check if there's any validation error
       if (!errors.isEmpty()) {
-        if (!errors.isEmpty()) {
-          return handleResponse.error({
-            res: res,
-            status: 401,
-            message: errors.array(),
-          });
-        }
+        return handleResponse.error({
+          res: res,
+          status: 401,
+          message: errors.array(),
+        });
       }
 
       // find user by id
@@ -463,50 +500,6 @@ export const controller = {
     }
   },
 
-  verifyEmail: async function (req: Request, res: Response) {
-    try {
-      const { email } = req.body;
-
-      const errors = validationResult(req);
-
-      // check if there's any validation error
-      if (!errors.isEmpty()) {
-        return handleResponse.error({
-          res: res,
-          status: 401,
-          message: errors.array(),
-        });
-      }
-
-      // find user by email
-      const user = await User.findOne({ email: email });
-
-      // check if user does not exist
-      if (!user) {
-        return handleResponse.error({
-          res: res,
-          status: 404,
-          message: 'User does not exist',
-        });
-      }
-
-      const { verification, otp, password, ...data } = user.toObject();
-
-      return handleResponse.success({
-        res: res,
-        status: 200,
-        message: 'User verification successful',
-        data: { ...data },
-      });
-    } catch (error: any) {
-      return handleResponse.error({
-        res: res,
-        status: 500,
-        message: error.message,
-      });
-    }
-  },
-
   changePassword: async function (req: Request, res: Response) {
     try {
       const { email, password } = req.body;
@@ -568,13 +561,11 @@ export const controller = {
       const errors = validationResult(req);
 
       if (!errors.isEmpty()) {
-        if (!errors.isEmpty()) {
-          return handleResponse.error({
-            res: res,
-            status: 401,
-            message: errors.array(),
-          });
-        }
+        return handleResponse.error({
+          res: res,
+          status: 401,
+          message: errors.array(),
+        });
       }
 
       const user = await User.findById(id);
@@ -671,7 +662,7 @@ export const controller = {
         res: res,
         status: 200,
         message: 'Photo uploaded successfully',
-        data: { photo: { name: encrypted, url: url } },
+        data: { name: encrypted, url: url },
       });
     } catch (error: any) {
       return handleResponse.error({

@@ -24,10 +24,16 @@ const routes = {
     (req: Request, res: Response) => controller.create(req, res)
   ),
 
-  verify: userRouter.put(
-    '/verify/token/:token',
-    validate.verifyToken,
-    (req: Request, res: Response) => controller.verify(req, res)
+  emailVerification: userRouter.put(
+    '/verification/email',
+    validate.emailVerification,
+    (req: Request, res: Response) => controller.emailVerification(req, res)
+  ),
+
+  verification: userRouter.get(
+    '/verify/email',
+    validate.verification,
+    (req: Request, res: Response) => controller.verification(req, res)
   ),
 
   authenticate: userRouter.post(
@@ -64,12 +70,6 @@ const routes = {
     '/verify/otp/:id',
     validate.verifyOTP,
     (req: Request, res: Response) => controller.verifyOTP(req, res)
-  ),
-
-  verifyEmail: userRouter.get(
-    '/verify/email',
-    validate.verifyEmail,
-    (req: Request, res: Response) => controller.verifyEmail(req, res)
   ),
 
   changePassword: userRouter.put(

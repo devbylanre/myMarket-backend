@@ -30,9 +30,9 @@ export const notification = {
 
   fetch: async function (req: Request, res: Response) {
     try {
-      const { userId } = req.params;
+      const { recipient } = req.params;
 
-      const notifications = await Notification.find({ user: userId });
+      const notifications = await Notification.find({ recipient: recipient });
 
       return notifications;
     } catch (err) {

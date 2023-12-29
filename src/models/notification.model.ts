@@ -1,25 +1,25 @@
 import mongoose, { Schema, Types } from 'mongoose';
 
 export interface NotificationTypes {
-  userId: Types.ObjectId;
-  message: string;
-  activityType: string;
-  relatedUserId?: Types.ObjectId;
-  timestamp?: Date;
+  recipient: Types.ObjectId;
+  content: string;
+  type: 'sign-up' | 'pinned' | 'follow';
+  sender?: Types.ObjectId;
+  createdAt?: Date;
   read?: boolean;
 }
 
 const notificationSchema = new Schema<NotificationTypes>({
-  userId: {
+  recipient: {
     type: Schema.Types.ObjectId,
     required: true,
     default: '',
     ref: 'user',
   },
-  relatedUserId: { type: Schema.Types.ObjectId, ref: 'user' },
-  message: { type: String, required: true },
-  activityType: { type: String, required: true },
-  timestamp: { type: Date, required: true, default: Date.now() },
+  content: { type: String, required: true },
+  type: { type: String, required: true },
+  sender: { type: Schema.Types.ObjectId },
+  createdAt: { type: Date, default: Date.now() },
   read: { type: Boolean, required: true, default: false },
 });
 

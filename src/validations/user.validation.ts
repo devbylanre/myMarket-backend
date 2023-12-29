@@ -38,10 +38,10 @@ const helper = {
 
   validateMongoID: ({ field, msgPrefix, isParam = true }: IValidateMongoId) => {
     if (isParam) {
-      return param(field).isMongoId().withMessage(`Invalid ${msgPrefix} ID`);
+      return param(field).isMongoId().withMessage(`Invalid ${msgPrefix}`);
     }
 
-    return body(field).isMongoId().withMessage('Invalid ${msgPrefix} ID');
+    return body(field).isMongoId().withMessage(`Invalid ${msgPrefix}`);
   },
 };
 
@@ -64,18 +64,20 @@ export const validate = {
     helper.validatePassword({ field: 'password', msgPrefix: 'password' }),
   ],
 
-  verifyToken: [
-    helper.validateMongoID({
-      field: 'token',
-      msgPrefix: 'verification token',
-    }),
-  ],
-
   update: [helper.validateMongoID({ field: 'id', msgPrefix: 'user' })],
 
   fetch: [helper.validateMongoID({ field: 'id', msgPrefix: 'user' })],
 
   fetchProducts: [helper.validateMongoID({ field: 'id', msgPrefix: 'user' })],
+
+  verification: [
+    helper.validateEmail({ field: 'email', msgPrefix: 'email address' }),
+  ],
+
+  emailVerification: [
+    helper.validateString({ field: 'token', msgPrefix: 'token' }),
+    helper.validateEmail({ field: 'email', msgPrefix: 'email address' }),
+  ],
 
   createOTP: [helper.validateMongoID({ field: 'id', msgPrefix: 'user' })],
 
@@ -85,10 +87,6 @@ export const validate = {
       .validateString({ field: 'code', msgPrefix: 'One Time Password' })
       .isLength({ min: 6, max: 6 })
       .withMessage('One time password must be at least 6 characters in length'),
-  ],
-
-  verifyEmail: [
-    helper.validateEmail({ field: 'email', msgPrefix: 'email address' }),
   ],
 
   changePassword: [
