@@ -1,7 +1,7 @@
 import { validationResult } from 'express-validator';
 import { handleResponse } from '../utils/res.util';
 import { Request, Response } from 'express';
-import { Product } from '../models/product.model';
+import { IProduct, Product } from '../models/product.model';
 import { IAuthRequest } from '../middlewares/auth.middleware';
 
 // firebase
@@ -66,7 +66,7 @@ export const controller = {
       const product = await Product.create({
         ...data,
         images: uploadedImages,
-        sellerId: req.user,
+        user: req.user,
       });
 
       return handleResponse.success({
@@ -84,7 +84,7 @@ export const controller = {
     }
   },
 
-  update: async (req: Request, res: Response) => {
+  update: async (req: IAuthRequest, res: Response) => {
     try {
       const data = req.body;
       const { id } = req.params;
@@ -165,7 +165,7 @@ export const controller = {
         {
           $lookup: {
             from: 'users',
-            localField: 'sellerId',
+            localField: 'user',
             foreignField: '_id',
             as: 'seller',
           },
@@ -198,5 +198,97 @@ export const controller = {
         message: error.message,
       });
     }
+  },
+
+  like: async (req: IAuthRequest, res: Response) => {
+    try {
+      const user = req.user;
+      const { id } = req.params;
+
+      const product = await Product.findById(id);
+
+      if (!product) {
+        return handleResponse.error({
+          res: res,
+          status: 404,
+          message: 'Product not found',
+        });
+      }
+
+      let updatedProduct: IProduct | null;
+
+      if (product.likes.includes(user!)) {
+        const filter = product.likes.filter((like) => like !== user);
+        updatedProduct = await Product.findByIdAndUpdate(
+          id,
+          { likes: filter },
+          { new: true }
+        );
+
+        return handleResponse.success({
+          res: res,
+          status: 200,
+          message: 'Product like removed',
+          data: updatedProduct!.likes,
+        });
+      }
+
+      updatedProduct = await Product.findByIdAndUpdate(
+        id,
+        {
+          likes: [...product.likes, user],
+        },
+        { new: true }
+      );
+
+      return handleResponse.success({
+        res: res,
+        status: 200,
+        message: 'Post liked successfully',
+        data: updatedProduct!.likes,
+      });
+    } catch (error: any) {
+      return handleResponse.error({
+        res: res,
+        status: 500,
+        message: error.message,
+      });
+    }
+  },
+
+  review: async (req: IAuthRequest, res: Response) => {
+    try {
+      const user = req.user;
+      const { id } = req.params;
+      const { message, rating } = req.body;
+
+      const product = await Product.findById(id);
+
+      if (!product) {
+        return handleResponse.error({
+          res: res,
+          status: 404,
+          message: 'Product not found',
+        });
+      }
+
+      const reviews = await Product.findByIdAndUpdate(
+        product._id,
+        {
+          reviews: [
+            ...product.reviews,
+            { user: user, rating: rating, message: message },
+          ],
+        },
+        { new: true }
+      );
+
+      return handleResponse.success({
+        res: res,
+        status: 200,
+        message: 'Product review submitted successfully',
+        data: { ...reviews!.reviews },
+      });
+    } catch (error: any) {}
   },
 };

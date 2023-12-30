@@ -31,7 +31,7 @@ const routes = {
   ),
 
   verification: userRouter.get(
-    '/verify/email',
+    '/verification',
     validate.verification,
     (req: Request, res: Response) => controller.verification(req, res)
   ),

@@ -87,9 +87,10 @@ export const controller = {
         'verification.token': verificationToken,
       });
 
+      // create a sign-up notification
       await notification.create({
         recipient: user._id,
-        content: 'Welcome to myMarket',
+        content: `Welcome aboard, ${data.firstName} ${data.lastName}! 🚀 Get started with your personalized journey`,
         type: 'sign-up',
       });
 
@@ -101,7 +102,7 @@ export const controller = {
         data: {
           username: `${data.firstName} ${data.lastName}`,
           subject: 'Welcome to myMarket',
-          verificationUrl: `http://localhost:3000/auth/verify/${verificationToken}`,
+          verificationUrl: `http://localhost:3000/verify?email=${data.email}&token=${verificationToken}`,
         },
       });
 
@@ -124,6 +125,16 @@ export const controller = {
     try {
       const { email, token } = req.body;
 
+      const errors = validationResult(req);
+
+      if (!errors.isEmpty()) {
+        return handleResponse.error({
+          res: res,
+          status: 401,
+          message: errors.array(),
+        });
+      }
+
       const user = await User.findOne({ email: email });
 
       if (!user) {
@@ -138,7 +149,7 @@ export const controller = {
         return handleResponse.error({
           res: res,
           status: 401,
-          message: 'Invalid verification token',
+          message: 'Invalid email verification token',
         });
       }
 
@@ -291,6 +302,20 @@ export const controller = {
           status: 400,
           message: 'No data to update',
         });
+      }
+
+      if (data?.store?.name) {
+        const storeNameExists = await User.findOne({
+          'store.name': data.store.name,
+        });
+
+        if (storeNameExists) {
+          return handleResponse.error({
+            res: res,
+            status: 400,
+            message: 'Store name already exists',
+          });
+        }
       }
 
       // find user by id

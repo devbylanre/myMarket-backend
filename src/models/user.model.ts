@@ -8,6 +8,7 @@ export interface IUser extends Document {
   bio: string;
   password: string;
   email: string;
+  followers: Types.ObjectId[];
   mobile: {
     country: string;
     countryCode: number;
@@ -22,7 +23,6 @@ export interface IUser extends Document {
   store: {
     name: string;
     description: string;
-    followers: Types.ObjectId[];
     location: {
       country: string;
       state: string;

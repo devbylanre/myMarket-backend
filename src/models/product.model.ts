@@ -1,6 +1,6 @@
 import mongoose, { Schema, Types } from 'mongoose';
 
-interface IProduct {
+export interface IProduct {
   title: string;
   tagline: string;
   description: string;
@@ -14,10 +14,12 @@ interface IProduct {
   tags: string[];
   price: number;
   discount: number;
-  sellerId: Types.ObjectId;
+  user: Types.ObjectId;
+  views: number;
+  likes: Types.ObjectId[];
   reviews: {
-    userId: Types.ObjectId;
-    rate: number;
+    user: Types.ObjectId;
+    rating: number;
     message: string;
   }[];
 }
@@ -29,6 +31,8 @@ const productSchema = new Schema<IProduct>({
   brand: { type: String, required: true },
   model: { type: String, required: true },
   category: { type: String, required: true },
+  likes: [{ type: Schema.Types.ObjectId }],
+  views: { type: Number, default: 0 },
   images: [
     {
       name: { type: String, required: true },
@@ -38,11 +42,11 @@ const productSchema = new Schema<IProduct>({
   ],
   price: { type: Number, required: true },
   discount: { type: Number, default: 0 },
-  sellerId: { type: Schema.Types.ObjectId, required: true },
+  user: { type: Schema.Types.ObjectId, required: true },
   reviews: [
     {
-      userId: { type: Types.ObjectId },
-      rate: { type: Number },
+      user: { type: Types.ObjectId },
+      rating: { type: Number },
       message: { type: String },
     },
   ],

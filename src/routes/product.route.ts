@@ -45,6 +45,18 @@ const routes = {
     validate.fetch,
     (req: Request, res: Response) => controller.fetch(req, res)
   ),
+
+  like: productRouter.put(
+    '/like/:id',
+    auth.user,
+    (req: Request, res: Response) => controller.like(req, res)
+  ),
+
+  review: productRouter.put(
+    '/review/:id',
+    auth.user,
+    (req: Request, res: Response) => controller.review(req, res)
+  ),
 };
 
 export default productRouter;
