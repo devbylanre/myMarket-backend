@@ -100,7 +100,7 @@ export const controller = {
         data: {
           username: `${data.firstName} ${data.lastName}`,
           subject: 'Welcome to myMarket',
-          verificationUrl: `http://localhost:3000/verify?email=${data.email}&token=${verificationToken}`,
+          verificationUrl: `http://localhost:3000/email/verify?email=${data.email}&token=${verificationToken}`,
         },
       });
 
