@@ -34,7 +34,7 @@ app.use('/user', userRouter);
 app.use('/product', productRouter);
 
 mongoose
-  .connect(config.mongoDBDriver + 'myMarket')
+  .connect(config.mongoDBDriver)
   .then(() => {
     app.listen(config.port, 'localhost', () =>
       console.log(`Welcome to port ${config.port} John Doe`)
