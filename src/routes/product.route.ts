@@ -14,7 +14,6 @@ const routes = {
   create: productRouter.post(
     '/create',
     auth.user,
-    [...rules.create, validate],
     upload.array('images'),
     (req: Request, res: Response) => {
       controller.create(req, res);
@@ -22,31 +21,31 @@ const routes = {
   ),
 
   update: productRouter.put(
-    '/update/:id',
-    auth.user,
+    '/:id',
     [...rules.update, validate],
+    auth.user,
     (req: Request, res: Response) => {
       controller.update(req, res);
     }
   ),
 
   delete: productRouter.delete(
-    '/delete/:id',
+    '/:id',
     auth.user,
-    [rules.delete, validate],
+    [...rules.delete, validate],
     (req: Request, res: Response) => {
       controller.delete(req, res);
     }
   ),
 
   fetch: productRouter.get(
-    '/fetch/single/:id',
+    '/:id',
     auth.user,
-    [rules.fetch, validate],
+    [...rules.fetch, validate],
     (req: Request, res: Response) => controller.fetch(req, res)
   ),
 
-  fetchAll: productRouter.get('/fetch/all', (req: Request, res: Response) =>
+  fetchAll: productRouter.get('/all', (req: Request, res: Response) =>
     controller.fetchAll(req, res)
   ),
 };

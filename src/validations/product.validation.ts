@@ -40,22 +40,21 @@ const baseValidation = [
   body('user', 'User must be a valid MongoDB ObjectId').optional().isMongoId(),
 ];
 
-const validateParam = (paramName: string) => {
-  return param(paramName)
-    .isMongoId()
-    .withMessage('Product id must be a valid MongoDB ObjectId');
-};
+const validateParam = [
+  param('id', 'Product id must be a valid Object id').isMongoId(),
+];
 
 const rules = {
   create: baseValidation,
-  update: [validateParam('id'), ...baseValidation],
-  delete: validateParam('id'),
-  fetch: validateParam('id'),
+  update: [...validateParam, ...baseValidation],
+  delete: validateParam,
+  fetch: validateParam,
 };
 
 const validate = (req: Request, res: Response, next: NextFunction) => {
   const errors = validationResult(req);
 
+  // return a json error object if errors is not empty
   if (!errors.isEmpty()) {
     return handleResponse.error({
       res: res,
@@ -63,6 +62,8 @@ const validate = (req: Request, res: Response, next: NextFunction) => {
       message: errors.array(),
     });
   }
+
+  return next();
 };
 
 export { validate, rules };

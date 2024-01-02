@@ -37,7 +37,7 @@ export const auth = {
         });
       }
 
-      req.user = decoded;
+      req.user = decoded.id;
 
       // continue to the next middleware function
       next();
