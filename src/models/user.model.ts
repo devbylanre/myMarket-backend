@@ -1,6 +1,44 @@
-import mongoose, { Schema, Document, Types } from 'mongoose';
+import mongoose, { Schema, Document } from 'mongoose';
 
-export interface IUser extends Document {
+interface MobileProps {
+  country: string;
+  code: number;
+  number: number;
+}
+
+interface BillingProps {
+  country: string;
+  state: string;
+  city: string;
+  address: string;
+}
+
+interface StoreProps {
+  name: string;
+  description: string;
+  location: BillingProps;
+}
+
+interface OTPProps {
+  code: string;
+  expiresAt: number;
+}
+
+interface AccountProps {
+  platform: string;
+  url: string;
+}
+
+interface verificationProps {
+  token: string;
+  isVerified: boolean;
+}
+
+interface PhotoProps {
+  url: string;
+  name: string;
+}
+export interface UserProps extends Document {
   isSeller: boolean;
   balance: number;
   firstName: string;
@@ -8,48 +46,16 @@ export interface IUser extends Document {
   bio: string;
   password: string;
   email: string;
-  followers: Types.ObjectId[];
-  mobile: {
-    country: string;
-    countryCode: number;
-    number: number;
-  };
-  billing: {
-    country: string;
-    state: string;
-    city: string;
-    address: string;
-  };
-  store: {
-    name: string;
-    description: string;
-    location: {
-      country: string;
-      state: string;
-      city: string;
-      address: string;
-    };
-  };
-  otp: {
-    code: string;
-    expiresAt: number;
-  };
-  accounts: {
-    platform: string;
-    url: string;
-  }[];
-  savedProducts: Types.ObjectId[];
-  verification: {
-    token: string;
-    isVerified: boolean;
-  };
-  photo: {
-    url: string;
-    name: string;
-  };
+  mobile: MobileProps;
+  billing: BillingProps;
+  store: StoreProps;
+  otp: OTPProps;
+  accounts: AccountProps[];
+  verification: verificationProps;
+  photo: PhotoProps;
 }
 
-const userSchema = new Schema<IUser>(
+const userSchema = new Schema<UserProps>(
   {
     isSeller: { type: Boolean, default: false },
     balance: { type: Number, default: 0.0 },
@@ -58,14 +64,13 @@ const userSchema = new Schema<IUser>(
     email: { type: String, required: true, unique: true },
     password: { type: String, required: true },
     bio: { type: String, required: true },
-    savedProducts: [{ type: Schema.Types.ObjectId }],
     verification: {
       token: { type: String, default: '' },
       isVerified: { type: Boolean, default: false },
     },
     mobile: {
       country: { type: String, default: 'Nigeria' },
-      countryCode: { type: Number, default: 234 },
+      code: { type: Number, default: 234 },
       number: { type: Number, default: 0 },
     },
     billing: {
@@ -89,10 +94,7 @@ const userSchema = new Schema<IUser>(
       code: { type: String, default: '' },
       expiresAt: { type: Number, default: 0 },
     },
-    accounts: [
-      { platform: { type: String }, url: { type: String } },
-      { _id: false },
-    ],
+    accounts: [{ platform: { type: String }, url: { type: String } }],
     photo: {
       url: { type: String, default: '' },
       name: { type: String, default: '' },
@@ -101,4 +103,4 @@ const userSchema = new Schema<IUser>(
   { timestamps: true }
 );
 
-export const User = mongoose.model<IUser>('user', userSchema);
+export const User = mongoose.model<UserProps>('user', userSchema);

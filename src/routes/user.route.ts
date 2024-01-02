@@ -1,6 +1,6 @@
 import { Request, Response, Router } from 'express';
 import { controller } from '../controllers/user.controller';
-import { validate } from '../validations/user.validation';
+import { rules, validate } from '../validations/user.validation';
 import { fileUtil } from '../utils/file.util';
 import multer from 'multer';
 
@@ -12,7 +12,7 @@ const upload = multer({
     fileSize: 5 * 1024 * 1024,
     files: 1,
   },
-  fileFilter(req, file, callback) {
+  fileFilter(_, file, callback) {
     fileUtil.isImage(file, callback);
   },
 });
@@ -20,75 +20,75 @@ const upload = multer({
 const routes = {
   create: userRouter.post(
     '/create',
-    validate.create,
+    [...rules.create, validate],
     (req: Request, res: Response) => controller.create(req, res)
-  ),
-
-  emailVerification: userRouter.put(
-    '/verification/email',
-    validate.emailVerification,
-    (req: Request, res: Response) => controller.emailVerification(req, res)
-  ),
-
-  verification: userRouter.get(
-    '/verification',
-    validate.verification,
-    (req: Request, res: Response) => controller.verification(req, res)
   ),
 
   authenticate: userRouter.post(
     '/auth',
-    validate.authenticate,
+    [...rules.authentication, validate],
     (req: Request, res: Response) => controller.authenticate(req, res)
   ),
 
-  update: userRouter.put(
-    '/update/:id',
-    validate.update,
-    (req: Request, res: Response) => controller.update(req, res)
+  verify: userRouter.get(
+    '/verify',
+    [...rules.verify, validate],
+    (req: Request, res: Response) => controller.verify(req, res)
   ),
 
   fetch: userRouter.get(
-    '/fetch/:id',
-    validate.fetch,
+    '/:id',
+    [...rules.fetch, validate],
     (req: Request, res: Response) => controller.fetch(req, res)
   ),
 
   fetchProducts: userRouter.get(
-    '/fetch/products/:id',
-    validate.fetchProducts,
+    '/products/:id',
+    [...rules.fetchProducts, validate],
     (req: Request, res: Response) => controller.fetchProducts(req, res)
   ),
 
-  createOTP: userRouter.put(
-    '/create/otp/:id',
-    validate.createOTP,
-    (req: Request, res: Response) => controller.createOTP(req, res)
+  update: userRouter.put(
+    '/:id',
+    [...rules.update, validate],
+    (req: Request, res: Response) => controller.update(req, res)
   ),
 
-  verifyOTP: userRouter.get(
-    '/verify/otp/:id',
-    validate.verifyOTP,
-    (req: Request, res: Response) => controller.verifyOTP(req, res)
+  photoUpload: userRouter.post(
+    '/photo/upload',
+    [...rules.photoUpload, validate],
+    upload.single('photo'),
+    (req: Request, res: Response) => controller.uploadPhoto(req, res)
   ),
 
-  changePassword: userRouter.put(
-    '/change/password/',
-    validate.changePassword,
-    (req: Request, res: Response) => controller.changePassword(req, res)
+  verifyEmail: userRouter.post(
+    '/email/verify',
+    [...rules.verifyEmail, validate],
+    (req: Request, res: Response) => controller.verifyEmail(req, res)
   ),
 
-  changeEmail: userRouter.put(
-    '/change/email/:id',
-    validate.changeEmail,
+  changeEmail: userRouter.post(
+    '/email/change',
+    [...rules.changeEmail, validate],
     (req: Request, res: Response) => controller.changeEmail(req, res)
   ),
 
-  uploadPhoto: userRouter.put(
-    '/upload/photo/:id',
-    validate.uploadPhoto,
-    upload.single('photo'),
-    (req: Request, res: Response) => controller.uploadPhoto(req, res)
+  changePassword: userRouter.post(
+    '/password/change',
+    validate,
+    (req: Request, res: Response) => controller.changePassword(req, res)
+  ),
+
+  generateOTP: userRouter.post(
+    '/otp/generate',
+    [...rules.generateOTP, validate],
+    (req: Request, res: Response) => controller.generateOTP(req, res)
+  ),
+
+  verifyOTP: userRouter.post(
+    '/otp/verify',
+    [...rules.verifyOTP, validate],
+    (req: Request, res: Response) => controller.verifyOTP(req, res)
   ),
 };
 

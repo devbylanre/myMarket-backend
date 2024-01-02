@@ -1,111 +1,68 @@
-import { body, param } from 'express-validator';
+import { NextFunction, Request, Response } from 'express';
+import { body, check, param, validationResult } from 'express-validator';
+import { handleResponse } from '../utils/res.util';
 
-interface IValidateField {
-  field: string;
-  maxLength: number;
-  msgPrefix: string;
-}
+const baseValidation = [
+  body('title', 'Title must be a non-empty string')
+    .optional()
+    .isString()
+    .notEmpty(),
+  body('tagline', 'Tagline must be a non-empty string')
+    .optional()
+    .isString()
+    .notEmpty(),
+  body('description', 'Description must be a non-empty string')
+    .optional()
+    .isString()
+    .notEmpty(),
+  body('brand', 'Brand must be a non-empty string')
+    .optional()
+    .isString()
+    .notEmpty(),
+  body('model', 'Model must be a non-empty string')
+    .optional()
+    .isString()
+    .notEmpty(),
+  body('category', 'Category must be a non-empty string')
+    .optional()
+    .isString()
+    .notEmpty(),
+  body('images', 'Images must be a non-empty array')
+    .optional()
+    .isArray({ min: 1 }),
+  body('tags', 'Tags must be a non-empty array').optional().isArray({ min: 1 }),
+  body('tags.*', 'Each tag must be a non-empty string')
+    .optional()
+    .isString()
+    .notEmpty(),
+  body('price', 'Price must be a numeric value').optional().isNumeric(),
+  body('discount', 'Discount must be a numeric value').optional().isNumeric(),
+  body('user', 'User must be a valid MongoDB ObjectId').optional().isMongoId(),
+];
 
-const helper = {
-  validateString: ({
-    field,
-    msgPrefix,
-  }: {
-    field: string;
-    msgPrefix: string;
-  }) => {
-    return body(field)
-      .trim()
-      .notEmpty()
-      .withMessage(`${msgPrefix} is required`)
-      .isString()
-      .withMessage(`${msgPrefix} must be a string`);
-  },
-
-  validateIsMongoId: ({
-    isParam = false,
-    field,
-    message,
-  }: {
-    isParam?: boolean;
-    field: string;
-    message: string;
-  }) => {
-    if (isParam) {
-      return param(field).isMongoId().withMessage(message);
-    }
-
-    return body(field).isMongoId().withMessage(message);
-  },
+const validateParam = (paramName: string) => {
+  return param(paramName)
+    .isMongoId()
+    .withMessage('Product id must be a valid MongoDB ObjectId');
 };
 
-export const validate = {
-  create: [
-    helper
-      .validateString({
-        field: 'title',
-        msgPrefix: 'Product title',
-      })
-      .isLength({ max: 100 })
-      .withMessage('Product title cannot exceed 100 characters'),
-    helper
-      .validateString({
-        field: 'tagline',
-        msgPrefix: 'Product tagline',
-      })
-      .isLength({ max: 256 })
-      .withMessage('Product tagline cannot exceed 256 characters'),
-    helper
-      .validateString({
-        field: 'description',
-        msgPrefix: 'Product description',
-      })
-      .isLength({ max: 1024 })
-      .withMessage('Product description cannot exceed 1024 characters'),
-    helper.validateString({
-      field: 'brand',
-      msgPrefix: 'Product brand',
-    }),
-    helper.validateString({
-      field: 'model',
-      msgPrefix: 'Product model',
-    }),
-    helper.validateString({
-      field: 'category',
-      msgPrefix: 'Product category',
-    }),
-    body('price').isInt().withMessage('Product price must be a number'),
-    body('discount')
-      .optional()
-      .isInt()
-      .withMessage('Product discount must be a number'),
-    helper.validateString({
-      field: 'seller ID',
-      msgPrefix: 'Seller ID',
-    }),
-  ],
-
-  update: [
-    helper.validateIsMongoId({
-      isParam: true,
-      field: 'id',
-      message: 'Provide a valid product ID',
-    }),
-  ],
-
-  delete: [
-    helper.validateIsMongoId({
-      isParam: true,
-      field: 'id',
-      message: 'Provide a valid product ID',
-    }),
-  ],
-
-  fetch: [
-    helper.validateIsMongoId({
-      isParam: true,
-      field: 'id',
-      message: 'Provide a valid product ID',
-    }),
-  ],
+const rules = {
+  create: baseValidation,
+  update: [validateParam('id'), ...baseValidation],
+  delete: validateParam('id'),
+  fetch: validateParam('id'),
 };
+
+const validate = (req: Request, res: Response, next: NextFunction) => {
+  const errors = validationResult(req);
+
+  if (!errors.isEmpty()) {
+    return handleResponse.error({
+      res: res,
+      status: 500,
+      message: errors.array(),
+    });
+  }
+};
+
+export { validate, rules };

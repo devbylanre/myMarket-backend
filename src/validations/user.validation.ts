@@ -1,109 +1,152 @@
-import { body, param } from 'express-validator';
+import { NextFunction, Request, Response } from 'express';
+import {
+  body,
+  param,
+  ValidationChain,
+  validationResult,
+} from 'express-validator';
+import { handleResponse } from '../utils/res.util';
 
-interface IValidate {
-  field: string;
-  msgPrefix: string;
-}
+const baseValidation = [
+  body('isSeller', 'isSeller must be a boolean').optional().isBoolean(),
+  body('balance', 'Balance must be a number').optional().isNumeric(),
+  body('firstName', 'First name must be a string')
+    .optional()
+    .isString()
+    .notEmpty(),
+  body('lastName', 'Last name must be a string')
+    .optional()
+    .isString()
+    .notEmpty(),
+  body('bio', 'Bio must be a string').optional().isString().notEmpty(),
+  body(
+    'password',
+    'Use a strong password containing at least one uppercase, lowercase, number and special character'
+  )
+    .optional()
+    .isStrongPassword(),
+  body('email', 'Email must be a valid email address').optional().isEmail(),
+  body('mobile', 'Mobile must be an object and not empty')
+    .optional()
+    .isObject()
+    .notEmpty(),
+  body('mobile.country', 'Mobile country must be a string')
+    .optional()
+    .isString()
+    .notEmpty(),
+  body('mobile.code', 'Mobile code must be a number')
+    .optional()
+    .isNumeric()
+    .notEmpty(),
+  body('mobile.number', 'Mobile number must be a number')
+    .optional()
+    .isNumeric()
+    .notEmpty(),
+  body('billing', 'Billing must be an object and not empty')
+    .optional()
+    .isObject()
+    .notEmpty(),
+  body('billing.country', 'Billing country must be a string')
+    .optional()
+    .isString()
+    .notEmpty(),
+  body('billing.state', 'Billing state must be a string')
+    .optional()
+    .isString()
+    .notEmpty(),
+  body('billing.city', 'Billing city must be a string').optional().isString(),
+  body('billing.address', 'Billing address must be a string')
+    .optional()
+    .isString()
+    .notEmpty(),
+  body('store', 'Store must be an object and not empty')
+    .optional()
+    .isObject()
+    .notEmpty(),
+  body('store.name', 'Store name must be a string').optional().isString(),
+  body('store.description', 'Store description must be a string')
+    .optional()
+    .isString()
+    .notEmpty(),
+  body('store.location', 'Store location must be an object and not empty')
+    .optional()
+    .isObject()
+    .notEmpty(),
+  body('store.location.country', 'Store location country must be a string')
+    .optional()
+    .isString()
+    .notEmpty(),
+  body('store.location.state', 'Store location state must be a string')
+    .optional()
+    .isString()
+    .notEmpty(),
+  body('store.location.city', 'Store location city must be a string')
+    .optional()
+    .isString()
+    .notEmpty(),
+  body('store.location.address', 'Store location address must be a string')
+    .optional()
+    .isString()
+    .notEmpty(),
+  body('accounts', 'Accounts must be an array').optional().isArray(),
+  body('accounts.*.platform', 'Accounts platform must be a string')
+    .optional()
+    .isString()
+    .notEmpty(),
+  body('accounts.*.url', 'Accounts url must be a string')
+    .optional()
+    .isString()
+    .notEmpty(),
+];
 
-interface IValidateMongoId extends IValidate {
-  isParam?: boolean;
-}
+const newEmail = [
+  body('newEmail', 'New email address must be a valid email address')
+    .optional()
+    .isEmail(),
+];
 
-const helper = {
-  validateString: ({ field, msgPrefix }: IValidate) => {
-    return body(field)
-      .trim()
-      .notEmpty()
-      .withMessage(`Provide your ${msgPrefix}`)
-      .isString()
-      .withMessage(`${msgPrefix} must be a string`);
-  },
+const code = [
+  body('code', 'OTP code must be a string').optional().isString().notEmpty(),
+];
 
-  validateEmail: ({ field, msgPrefix }: IValidate) => {
-    return body(field)
-      .trim()
-      .notEmpty()
-      .withMessage(`Provide your ${msgPrefix}`)
-      .isEmail()
-      .withMessage(`Provide a valid ${msgPrefix} e.g team@google.com`);
-  },
+const token = [
+  body('token', 'Verification token must be a string')
+    .optional()
+    .isString()
+    .notEmpty(),
+];
 
-  validatePassword: ({ field, msgPrefix }: IValidate) => {
-    return body(field)
-      .isStrongPassword()
-      .withMessage(
-        `Use a strong ${msgPrefix} containing at least one uppercase, lowercase, number and special character`
-      );
-  },
-
-  validateMongoID: ({ field, msgPrefix, isParam = true }: IValidateMongoId) => {
-    if (isParam) {
-      return param(field).isMongoId().withMessage(`Invalid ${msgPrefix}`);
-    }
-
-    return body(field).isMongoId().withMessage(`Invalid ${msgPrefix}`);
-  },
+const validateObjectId = (paramName: string) => {
+  return [param(paramName, 'Invalid user object id').isMongoId()];
 };
 
-export const validate = {
-  create: [
-    helper.validateString({ field: 'firstName', msgPrefix: 'first name' }),
-    helper.validateString({ field: 'lastName', msgPrefix: 'last name' }),
-    helper.validateEmail({ field: 'email', msgPrefix: 'email address' }),
-    helper
-      .validateString({ field: 'bio', msgPrefix: 'bio' })
-      .isLength({ min: 100, max: 256 })
-      .withMessage(
-        'Biography require minimum of 100 and maximum of 256 characters'
-      ),
-    helper.validatePassword({ field: 'password', msgPrefix: 'password' }),
-  ],
-
-  authenticate: [
-    helper.validateEmail({ field: 'email', msgPrefix: 'email address' }),
-    helper.validatePassword({ field: 'password', msgPrefix: 'password' }),
-  ],
-
-  update: [helper.validateMongoID({ field: 'id', msgPrefix: 'user' })],
-
-  fetch: [helper.validateMongoID({ field: 'id', msgPrefix: 'user' })],
-
-  fetchProducts: [helper.validateMongoID({ field: 'id', msgPrefix: 'user' })],
-
-  verification: [
-    helper.validateEmail({ field: 'email', msgPrefix: 'email address' }),
-  ],
-
-  emailVerification: [
-    helper.validateString({ field: 'token', msgPrefix: 'token' }),
-    helper.validateEmail({ field: 'email', msgPrefix: 'email address' }),
-  ],
-
-  createOTP: [helper.validateMongoID({ field: 'id', msgPrefix: 'user' })],
-
-  verifyOTP: [
-    param('id').isMongoId().withMessage('Invalid User ID'),
-    helper
-      .validateString({ field: 'code', msgPrefix: 'One Time Password' })
-      .isLength({ min: 6, max: 6 })
-      .withMessage('One time password must be at least 6 characters in length'),
-  ],
-
-  changePassword: [
-    helper.validateString({
-      field: 'password.old',
-      msgPrefix: 'old password',
-    }),
-    helper.validatePassword({
-      field: 'password.new',
-      msgPrefix: 'new password',
-    }),
-  ],
-
-  changeEmail: [
-    helper.validateEmail({ field: 'email', msgPrefix: 'email address' }),
-    helper.validateString({ field: 'password', msgPrefix: 'password' }),
-  ],
-
-  uploadPhoto: [helper.validateMongoID({ field: 'id', msgPrefix: 'user Id' })],
+const rules = {
+  create: baseValidation,
+  authentication: baseValidation,
+  verify: baseValidation,
+  fetch: validateObjectId('id'),
+  fetchProducts: validateObjectId('id'),
+  update: [...validateObjectId('id'), ...baseValidation],
+  photoUpload: baseValidation,
+  verifyEmail: [...token, ...baseValidation],
+  changeEmail: [...newEmail, ...baseValidation],
+  generateOTP: baseValidation,
+  verifyOTP: [...code, ...baseValidation],
 };
+
+const validate = (req: Request, res: Response, next: NextFunction) => {
+  const errors = validationResult(req);
+
+  // check if errors is not empty and return a json error
+  if (!errors.isEmpty()) {
+    return handleResponse.error({
+      res: res,
+      status: 422,
+      message: errors.array(),
+    });
+  }
+
+  return next();
+};
+
+export { rules, validate };

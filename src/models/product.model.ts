@@ -16,12 +16,6 @@ export interface IProduct {
   discount: number;
   user: Types.ObjectId;
   views: number;
-  likes: Types.ObjectId[];
-  reviews: {
-    user: Types.ObjectId;
-    rating: number;
-    message: string;
-  }[];
 }
 
 const productSchema = new Schema<IProduct>({
@@ -31,7 +25,6 @@ const productSchema = new Schema<IProduct>({
   brand: { type: String, required: true },
   model: { type: String, required: true },
   category: { type: String, required: true },
-  likes: [{ type: Schema.Types.ObjectId }],
   views: { type: Number, default: 0 },
   images: [
     {
@@ -43,13 +36,6 @@ const productSchema = new Schema<IProduct>({
   price: { type: Number, required: true },
   discount: { type: Number, default: 0 },
   user: { type: Schema.Types.ObjectId, required: true },
-  reviews: [
-    {
-      user: { type: Types.ObjectId },
-      rating: { type: Number },
-      message: { type: String },
-    },
-  ],
 });
 
 export const Product = mongoose.model<IProduct>('Product', productSchema);

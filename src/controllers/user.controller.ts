@@ -1,7 +1,6 @@
 import mongoose from 'mongoose';
 import { User } from '../models/user.model';
-import { validationResult } from 'express-validator';
-import { Request, Response, response } from 'express';
+import { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
@@ -44,24 +43,21 @@ const helper = {
 
     return num;
   },
+
+  decodeJwt: (token: string) => {
+    return jwt.decode(token);
+  },
+
+  createJwt: (data: Record<string, any>, duration: string | number) => {
+    return jwt.sign(data, config.secret_key, { expiresIn: duration });
+  },
 };
 
 //  controller
-
 export const controller = {
   create: async (req: Request, res: Response) => {
     try {
       const data = req.body;
-      const errors = validationResult(req);
-
-      // check if there's any validation error
-      if (!errors.isEmpty()) {
-        return handleResponse.error({
-          res: res,
-          status: 401,
-          message: errors.array(),
-        });
-      }
 
       // find user by email
       const emailExists = await User.findOne({
@@ -80,10 +76,13 @@ export const controller = {
       // generate verification token
       const verificationToken = crypto.randomBytes(40).toString('hex');
 
+      // generate an encrypted password
+      const password = helper.hashPassword(data.password);
+
       // create user
       const user = await User.create({
         ...data,
-        password: helper.hashPassword(data.password as string),
+        password,
         'verification.token': verificationToken,
       });
 
@@ -94,7 +93,6 @@ export const controller = {
         type: 'sign-up',
       });
 
-      // send an email to the user
       await mailer.send({
         to: data.email,
         subject: 'Welcome to myMarket',
@@ -121,19 +119,305 @@ export const controller = {
     }
   },
 
-  emailVerification: async function (req: Request, res: Response) {
+  authenticate: async function (req: Request, res: Response) {
     try {
-      const { email, token } = req.body;
+      const auth = req.body;
 
-      const errors = validationResult(req);
+      // find the user
+      const user = await User.findOne({ email: auth.email });
 
-      if (!errors.isEmpty()) {
+      // check if user does not exist
+      if (!user) {
+        return handleResponse.error({
+          res: res,
+          status: 404,
+          message: 'User does not exist',
+        });
+      }
+
+      // check if user is verified
+      if (!user.verification.isVerified) {
+        return handleResponse.error({
+          res: res,
+          status: 403,
+          message:
+            'User is not verified, Check your email for verification link',
+        });
+      }
+
+      // verify password
+      const isPasswordMatch = helper.comparePassword(
+        auth.password,
+        user.password
+      );
+
+      // check if password does not match
+      if (!isPasswordMatch) {
         return handleResponse.error({
           res: res,
           status: 401,
-          message: errors.array(),
+          message: 'Password does not match',
         });
       }
+
+      const token = helper.createJwt({ id: user._id }, '24d');
+
+      const { exp } = helper.decodeJwt(token) as Record<string, any>;
+
+      const { password, otp, verification, ...data } = user.toObject();
+
+      return handleResponse.success({
+        res: res,
+        status: 200,
+        message: 'User authentication successful',
+        data: { ...data, token: { id: token, exp: exp } },
+      });
+    } catch (error: any) {
+      return handleResponse.error({
+        res: res,
+        status: 500,
+        message: error.message,
+      });
+    }
+  },
+
+  verify: async function (req: Request, res: Response) {
+    try {
+      const { email } = req.body;
+
+      // find user by email
+      const user = await User.findOne({ email: email });
+
+      // check if user does not exist
+      if (!user) {
+        return handleResponse.error({
+          res: res,
+          status: 404,
+          message: 'User does not exist',
+        });
+      }
+
+      const { verification, otp, password, ...data } = user.toObject();
+
+      return handleResponse.success({
+        res: res,
+        status: 200,
+        message: 'User verification successful',
+        data: data,
+      });
+    } catch (error: any) {
+      return handleResponse.error({
+        res: res,
+        status: 500,
+        message: error.message,
+      });
+    }
+  },
+
+  fetch: async function (req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+
+      // find user by id
+      const user = await User.findById(id);
+
+      // check if user does not exist
+      if (!user) {
+        return handleResponse.error({
+          res: res,
+          status: 404,
+          message: 'User not found',
+        });
+      }
+
+      const { password, verification, otp, ...data } = user.toObject();
+
+      return handleResponse.success({
+        res: res,
+        status: 200,
+        message: 'User data fetched successfully',
+        data: { ...data },
+      });
+    } catch (error: any) {
+      return handleResponse.error({
+        res: res,
+        status: 500,
+        message: error.message,
+      });
+    }
+  },
+
+  fetchProducts: async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+
+      const user = await User.findById(id);
+
+      if (!user) {
+        return handleResponse.error({
+          res: res,
+          status: 404,
+          message: 'User not found',
+        });
+      }
+
+      const query = await User.aggregate([
+        { $match: { _id: new mongoose.Types.ObjectId(id) } },
+        {
+          $lookup: {
+            from: 'products',
+            localField: '_id',
+            foreignField: 'user',
+            as: 'products',
+          },
+        },
+        {
+          $project: {
+            products: 1,
+            _id: 0,
+          },
+        },
+      ]);
+
+      if (!query[0].products || query[0].products.length === 0) {
+        return handleResponse.error({
+          res: res,
+          status: 404,
+          message: 'No products was found',
+        });
+      }
+
+      return handleResponse.success({
+        res: res,
+        status: 200,
+        message: 'Products found',
+        data: query[0].products,
+      });
+    } catch (error: any) {
+      return handleResponse.error({
+        res: res,
+        status: 500,
+        message: error.message,
+      });
+    }
+  },
+
+  update: async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { store, ...data } = req.body;
+
+      if (!req.body) {
+        return handleResponse.error({
+          res: res,
+          status: 400,
+          message: 'No data to update',
+        });
+      }
+
+      // find user by id
+      const userExists = await User.findById(id);
+
+      // check if user does not exists
+      if (!userExists) {
+        return handleResponse.error({
+          res: res,
+          status: 404,
+          message: 'Cannot update user that does not exist',
+        });
+      }
+
+      if (store && store?.name) {
+        const storeNameExists = await User.findOne({
+          'store.name': store.name,
+        });
+
+        if (storeNameExists) {
+          return handleResponse.error({
+            res: res,
+            status: 400,
+            message: 'Store name is already taken',
+          });
+        }
+      }
+
+      // update user data
+      await User.findByIdAndUpdate(id, { ...store, ...data });
+
+      return handleResponse.success({
+        res: res,
+        status: 200,
+        message: 'User data updated successfully',
+        data: { ...data, ...store },
+      });
+    } catch (error: any) {
+      return handleResponse.error({
+        res: res,
+        status: 500,
+        message: 'Unable to update user data',
+      });
+    }
+  },
+
+  uploadPhoto: async (req: Request, res: Response) => {
+    try {
+      const file = req.file;
+      const { email } = req.body;
+
+      if (!file) {
+        return handleResponse.error({
+          res: res,
+          status: 400,
+          message: 'No file specified',
+        });
+      }
+
+      const user = await User.findOne({ email: email });
+
+      if (!user) {
+        return handleResponse.error({
+          res: res,
+          status: 404,
+          message: 'User does not exist',
+        });
+      }
+
+      const encrypted =
+        user._id + '-' + Date.now() + path.extname(file.originalname);
+      const storageRef = ref(storage, `photos/${encrypted}`);
+
+      if (user.photo.name) {
+        const deleteRef = ref(storage, `/photos/${user.photo.name}`);
+        await deleteObject(deleteRef);
+      }
+
+      const snapshot = await uploadBytes(storageRef, file.buffer);
+      const url = await getDownloadURL(snapshot.ref);
+
+      const update = await User.findByIdAndUpdate(
+        user._id,
+        { photo: { url: url, name: encrypted } },
+        { new: true }
+      );
+
+      return handleResponse.success({
+        res: res,
+        status: 200,
+        message: 'Photo uploaded successfully',
+        data: { ...update?.photo },
+      });
+    } catch (error: any) {
+      return handleResponse.error({
+        res: res,
+        status: 500,
+        message: error.message,
+      });
+    }
+  },
+
+  verifyEmail: async (req: Request, res: Response) => {
+    try {
+      const { email, token } = req.body;
 
       const user = await User.findOne({ email: email });
 
@@ -173,25 +457,12 @@ export const controller = {
     }
   },
 
-  verification: async function (req: Request, res: Response) {
+  changeEmail: async function (req: Request, res: Response) {
     try {
-      const { email } = req.body;
+      const { email, newEmail, password } = req.body;
 
-      const errors = validationResult(req);
-
-      // check if there's any validation error
-      if (!errors.isEmpty()) {
-        return handleResponse.error({
-          res: res,
-          status: 401,
-          message: errors.array(),
-        });
-      }
-
-      // find user by email
       const user = await User.findOne({ email: email });
 
-      // check if user does not exist
       if (!user) {
         return handleResponse.error({
           res: res,
@@ -200,321 +471,23 @@ export const controller = {
         });
       }
 
-      const { verification, otp, password, ...data } = user.toObject();
+      const isMatch = helper.comparePassword(password, user.password);
+
+      if (!isMatch) {
+        return handleResponse.error({
+          res: res,
+          status: 401,
+          message: 'Incorrect password',
+        });
+      }
+
+      await User.findByIdAndUpdate(user._id, { email: newEmail });
 
       return handleResponse.success({
         res: res,
         status: 200,
-        message: 'User verification successful',
-        data: { ...data },
-      });
-    } catch (error: any) {
-      return handleResponse.error({
-        res: res,
-        status: 500,
-        message: error.message,
-      });
-    }
-  },
-
-  authenticate: async function (req: Request, res: Response) {
-    try {
-      const auth = req.body;
-
-      const errors = validationResult(req);
-
-      // check if there's any validation error
-      if (!errors.isEmpty()) {
-        return handleResponse.error({
-          res: res,
-          status: 401,
-          message: errors.array(),
-        });
-      }
-
-      // find the user
-      const user = await User.findOne({ email: auth.email });
-
-      // check if user does not exist
-      if (!user) {
-        return handleResponse.error({
-          res: res,
-          status: 404,
-          message: 'User does not exist',
-        });
-      }
-
-      // check if user is verified
-      if (!user.verification.isVerified) {
-        return handleResponse.error({
-          res: res,
-          status: 403,
-          message:
-            'User is not verified, Check your email for verification link',
-        });
-      }
-
-      // verify password
-      const isPasswordMatch = helper.comparePassword(
-        auth.password,
-        user.password
-      );
-
-      // check if password does not match
-      if (!isPasswordMatch) {
-        return handleResponse.error({
-          res: res,
-          status: 401,
-          message: 'Password does not match',
-        });
-      }
-
-      const token = jwt.sign({ _id: user._id }, config.secret_key, {
-        expiresIn: '24d',
-      });
-      const { exp } = jwt.decode(token) as Record<string, any>;
-
-      const { password, otp, verification, ...data } = user.toObject();
-
-      return handleResponse.success({
-        res: res,
-        status: 200,
-        message: 'User authentication successful',
-        data: { ...data, token: { id: token, exp: exp } },
-      });
-    } catch (error: any) {
-      return handleResponse.error({
-        res: res,
-        status: 500,
-        message: error.message,
-      });
-    }
-  },
-
-  update: async function (req: Request, res: Response) {
-    try {
-      const { id } = req.params;
-      const data = req.body;
-
-      if (!data || Object.keys(data).length < 1) {
-        return handleResponse.error({
-          res: res,
-          status: 400,
-          message: 'No data to update',
-        });
-      }
-
-      if (data?.store?.name) {
-        const storeNameExists = await User.findOne({
-          'store.name': data.store.name,
-        });
-
-        if (storeNameExists) {
-          return handleResponse.error({
-            res: res,
-            status: 400,
-            message: 'Store name already exists',
-          });
-        }
-      }
-
-      // find user by id
-      const userExists = await User.findById(id as any);
-
-      // check if user does not exists
-      if (!userExists) {
-        return handleResponse.error({
-          res: res,
-          status: 404,
-          message: 'Cannot update user that does not exist',
-        });
-      }
-
-      // update user data
-      await User.findByIdAndUpdate(id, data);
-
-      return handleResponse.success({
-        res: res,
-        status: 200,
-        message: 'User data updated successfully',
-        data: { ...data },
-      });
-    } catch (error: any) {
-      return handleResponse.error({
-        res: res,
-        status: 500,
-        message: 'Unable to update user data',
-      });
-    }
-  },
-
-  fetch: async function (req: Request, res: Response) {
-    try {
-      const { id } = req.params;
-
-      const errors = validationResult(req);
-
-      // check if there's any validation error
-      if (!errors.isEmpty()) {
-        return handleResponse.error({
-          res: res,
-          status: 401,
-          message: errors.array(),
-        });
-      }
-
-      // find user by id
-      const user = await User.findById(id);
-
-      // check if user does not exist
-      if (!user) {
-        return handleResponse.error({
-          res: res,
-          status: 404,
-          message: 'User not found',
-        });
-      }
-
-      const { password, verification, otp, ...data } = user.toObject();
-
-      return handleResponse.success({
-        res: res,
-        status: 200,
-        message: 'User data fetched successfully',
-        data: { ...data },
-      });
-    } catch (error: any) {
-      return handleResponse.error({
-        res: res,
-        status: 500,
-        message: error.message,
-      });
-    }
-  },
-
-  createOTP: async function (req: Request, res: Response) {
-    try {
-      const { id } = req.params;
-
-      const errors = validationResult(req);
-
-      // check if there's any validation error
-      if (!errors.isEmpty()) {
-        return handleResponse.error({
-          res: res,
-          status: 401,
-          message: errors.array(),
-        });
-      }
-
-      // find user by id
-      const user = await User.findById(id);
-
-      // check if user does not exist
-      if (!user) {
-        return handleResponse.error({
-          res: res,
-          status: 404,
-          message: 'User does not exist',
-        });
-      }
-
-      // generate token
-      const code = helper.generateNumbers(6);
-      const expiresAt = new Date().setTime(new Date().getTime() + 900000); // 15 minutes
-
-      // update user data
-      await User.findByIdAndUpdate(id, {
-        'otp.code': code,
-        'otp.expiresAt': expiresAt,
-      });
-
-      return handleResponse.success({
-        res: res,
-        status: 200,
-        message: 'OTP generated successfully',
-        data: { otp: { code, expiresAt } },
-      });
-    } catch (error: any) {
-      return handleResponse.error({
-        res: res,
-        status: 500,
-        message: error.message,
-      });
-    }
-  },
-
-  verifyOTP: async function (req: Request, res: Response) {
-    try {
-      const { id } = req.params;
-      const { code } = req.body;
-
-      const errors = validationResult(req);
-
-      // check if there's any validation error
-      if (!errors.isEmpty()) {
-        return handleResponse.error({
-          res: res,
-          status: 401,
-          message: errors.array(),
-        });
-      }
-
-      // find user
-      const user = await User.findById(id);
-
-      // check if user exists
-      if (!user) {
-        return handleResponse.error({
-          res: res,
-          status: 404,
-          message: 'User does not exist',
-        });
-      }
-
-      // check if token exist
-      if (!user.otp.code) {
-        return handleResponse.error({
-          res: res,
-          status: 401,
-          message: 'No One Time Password was found',
-        });
-      }
-
-      // check if the user token key matches the provided key
-      if (user.otp.code !== code) {
-        return handleResponse.error({
-          res: res,
-          status: 400,
-          message: 'Invalid One Time Password',
-        });
-      }
-
-      let result;
-
-      // check if current time is greater than the token expiration time
-      if (user.otp.expiresAt < Date.now()) {
-        result = await User.findByIdAndUpdate(id, {
-          'otp.key': '',
-          'otp.expiration': 0,
-        });
-        return handleResponse.error({
-          res: res,
-          status: 400,
-          message: 'One Time Password has expired',
-        });
-      }
-
-      result = await User.findByIdAndUpdate(id, {
-        'otp.code': '',
-        'otp.expiresAt': 0,
-      });
-
-      return handleResponse.success({
-        res: res,
-        status: 200,
-        message: 'One Time Password has been verified',
-        data: null,
+        message: 'Email changed successfully',
+        data: { email: newEmail },
       });
     } catch (error: any) {
       return handleResponse.error({
@@ -528,16 +501,6 @@ export const controller = {
   changePassword: async function (req: Request, res: Response) {
     try {
       const { email, password } = req.body;
-
-      const errors = validationResult(req);
-
-      if (!errors.isEmpty()) {
-        return handleResponse.error({
-          res: res,
-          status: 401,
-          message: errors.array(),
-        });
-      }
 
       const user = await User.findOne({ email: email });
 
@@ -578,23 +541,14 @@ export const controller = {
     }
   },
 
-  changeEmail: async function (req: Request, res: Response) {
+  generateOTP: async function (req: Request, res: Response) {
     try {
-      const { email, password } = req.body;
-      const { id } = req.params;
+      const { email } = req.body;
 
-      const errors = validationResult(req);
+      // find user by id
+      const user = await User.findOne({ email: email });
 
-      if (!errors.isEmpty()) {
-        return handleResponse.error({
-          res: res,
-          status: 401,
-          message: errors.array(),
-        });
-      }
-
-      const user = await User.findById(id);
-
+      // check if user does not exist
       if (!user) {
         return handleResponse.error({
           res: res,
@@ -603,23 +557,21 @@ export const controller = {
         });
       }
 
-      const isMatch = helper.comparePassword(password, user.password);
+      // generate token
+      const code = helper.generateNumbers(6);
+      const expiresAt = new Date().setTime(new Date().getTime() + 900000); // 15 minutes
 
-      if (!isMatch) {
-        return handleResponse.error({
-          res: res,
-          status: 401,
-          message: 'Incorrect password',
-        });
-      }
-
-      await User.findByIdAndUpdate(user._id, { email: email });
+      // update user data
+      await User.findByIdAndUpdate(user._id, {
+        'otp.code': code,
+        'otp.expiresAt': expiresAt,
+      });
 
       return handleResponse.success({
         res: res,
         status: 200,
-        message: 'Email changed successfully',
-        data: { email: email },
+        message: 'OTP generated successfully',
+        data: { otp: { code, expiresAt } },
       });
     } catch (error: any) {
       return handleResponse.error({
@@ -630,103 +582,59 @@ export const controller = {
     }
   },
 
-  uploadPhoto: async (req: Request, res: Response) => {
+  verifyOTP: async function (req: Request, res: Response) {
     try {
-      const file = req.file;
-      const { id } = req.params;
+      const { email, code } = req.body;
 
-      const errors = validationResult(req);
+      // find user
+      const user = await User.findOne({ email: email });
 
-      if (!errors.isEmpty()) {
-        if (!errors.isEmpty()) {
-          return handleResponse.error({
-            res: res,
-            status: 401,
-            message: errors.array(),
-          });
-        }
+      // check if user exists
+      if (!user) {
+        return handleResponse.error({
+          res: res,
+          status: 404,
+          message: 'User does not exist',
+        });
       }
 
-      if (!file) {
+      // check if token exist
+      if (!user.otp.code) {
+        return handleResponse.error({
+          res: res,
+          status: 401,
+          message: 'No One Time Password was found',
+        });
+      }
+
+      // check if the user token key matches the provided key
+      if (user.otp.code !== code) {
         return handleResponse.error({
           res: res,
           status: 400,
-          message: 'No file specified',
+          message: 'Invalid One Time Password',
         });
       }
 
-      const user = await User.findById(id);
-
-      if (!user) {
+      // check if current time is greater than the token expiration time
+      if (user.otp.expiresAt < Date.now()) {
         return handleResponse.error({
           res: res,
-          status: 404,
-          message: 'User does not exist',
+          status: 400,
+          message: 'One Time Password has expired',
         });
       }
 
-      const encrypted =
-        user._id + '-' + Date.now() + path.extname(file.originalname);
-      const storageRef = ref(storage, `photos/${encrypted}`);
-
-      if (user.photo.name) {
-        const deleteRef = ref(storage, `/photos/${user.photo.name}`);
-        await deleteObject(deleteRef);
-      }
-
-      const snapshot = await uploadBytes(storageRef, file.buffer);
-      const url = await getDownloadURL(snapshot.ref);
-
-      const update = await User.findByIdAndUpdate(
-        user._id,
-        { photo: { url: url, name: encrypted } },
-        { new: true }
-      );
+      await User.findByIdAndUpdate(user._id, {
+        'otp.code': '',
+        'otp.expiresAt': 0,
+      });
 
       return handleResponse.success({
         res: res,
         status: 200,
-        message: 'Photo uploaded successfully',
-        data: { name: encrypted, url: url },
-      });
-    } catch (error: any) {
-      return handleResponse.error({
-        res: res,
-        status: 500,
-        message: error.message,
-      });
-    }
-  },
-
-  fetchProducts: async (req: Request, res: Response) => {
-    try {
-      const { id } = req.params;
-
-      const products = await User.aggregate([
-        { $match: { _id: new mongoose.Types.ObjectId(id) } },
-        {
-          $lookup: {
-            from: 'products',
-            localField: '_id',
-            foreignField: 'sellerId',
-            as: 'products',
-          },
-        },
-      ]);
-
-      if (!products || products.length === 0) {
-        return handleResponse.error({
-          res: res,
-          status: 404,
-          message: 'No products was found',
-        });
-      }
-
-      return handleResponse.success({
-        res: res,
-        status: 200,
-        message: 'Products found',
-        data: products[0].products,
+        message: 'One Time Password has been verified',
+        data: null,
       });
     } catch (error: any) {
       return handleResponse.error({

@@ -4,7 +4,7 @@ interface ISuccessResponse {
   res: Response;
   status: number;
   message: Record<string, any>[] | string;
-  data: Record<string, any> | null;
+  data: Record<string, any> | Record<string, any>[] | null;
 }
 
 interface IErrorResponse {

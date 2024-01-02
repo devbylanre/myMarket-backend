@@ -28,16 +28,6 @@ export const controller = {
       const data = req.body;
       const images = req.files as Express.Multer.File[];
 
-      // const errors = validationResult(req);
-
-      // if (!errors.isEmpty()) {
-      //   return handleResponse.error({
-      //     res: res,
-      //     status: 401,
-      //     message: errors.array(),
-      //   });
-      // }
-
       if (!images) {
         return handleResponse.error({
           res: res,
@@ -200,52 +190,23 @@ export const controller = {
     }
   },
 
-  like: async (req: IAuthRequest, res: Response) => {
+  fetchAll: async (req: Request, res: Response) => {
     try {
-      const user = req.user;
-      const { id } = req.params;
+      const products = await Product.find();
 
-      const product = await Product.findById(id);
-
-      if (!product) {
+      if (!products || products.length < 1) {
         return handleResponse.error({
           res: res,
           status: 404,
-          message: 'Product not found',
+          message: 'No product was found',
         });
       }
-
-      let updatedProduct: IProduct | null;
-
-      if (product.likes.includes(user!)) {
-        const filter = product.likes.filter((like) => like !== user);
-        updatedProduct = await Product.findByIdAndUpdate(
-          id,
-          { likes: filter },
-          { new: true }
-        );
-
-        return handleResponse.success({
-          res: res,
-          status: 200,
-          message: 'Product like removed',
-          data: updatedProduct!.likes,
-        });
-      }
-
-      updatedProduct = await Product.findByIdAndUpdate(
-        id,
-        {
-          likes: [...product.likes, user],
-        },
-        { new: true }
-      );
 
       return handleResponse.success({
         res: res,
         status: 200,
-        message: 'Post liked successfully',
-        data: updatedProduct!.likes,
+        message: 'Products fetched successfully',
+        data: products,
       });
     } catch (error: any) {
       return handleResponse.error({
@@ -254,41 +215,5 @@ export const controller = {
         message: error.message,
       });
     }
-  },
-
-  review: async (req: IAuthRequest, res: Response) => {
-    try {
-      const user = req.user;
-      const { id } = req.params;
-      const { message, rating } = req.body;
-
-      const product = await Product.findById(id);
-
-      if (!product) {
-        return handleResponse.error({
-          res: res,
-          status: 404,
-          message: 'Product not found',
-        });
-      }
-
-      const reviews = await Product.findByIdAndUpdate(
-        product._id,
-        {
-          reviews: [
-            ...product.reviews,
-            { user: user, rating: rating, message: message },
-          ],
-        },
-        { new: true }
-      );
-
-      return handleResponse.success({
-        res: res,
-        status: 200,
-        message: 'Product review submitted successfully',
-        data: { ...reviews!.reviews },
-      });
-    } catch (error: any) {}
   },
 };

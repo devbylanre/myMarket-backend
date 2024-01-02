@@ -1,9 +1,8 @@
 import { Request, Response, Router } from 'express';
 import { controller } from '../controllers/product.controller';
 import multer from 'multer';
-import { fileUtil } from '../utils/file.util';
 import { auth } from '../middlewares/auth.middleware';
-import { validate } from '../validations/product.validation';
+import { rules, validate } from '../validations/product.validation';
 
 const productRouter = Router();
 
@@ -15,6 +14,7 @@ const routes = {
   create: productRouter.post(
     '/create',
     auth.user,
+    [...rules.create, validate],
     upload.array('images'),
     (req: Request, res: Response) => {
       controller.create(req, res);
@@ -24,7 +24,7 @@ const routes = {
   update: productRouter.put(
     '/update/:id',
     auth.user,
-    validate.update,
+    [...rules.update, validate],
     (req: Request, res: Response) => {
       controller.update(req, res);
     }
@@ -33,29 +33,21 @@ const routes = {
   delete: productRouter.delete(
     '/delete/:id',
     auth.user,
-    validate.delete,
+    [rules.delete, validate],
     (req: Request, res: Response) => {
       controller.delete(req, res);
     }
   ),
 
   fetch: productRouter.get(
-    '/fetch/:id',
+    '/fetch/single/:id',
     auth.user,
-    validate.fetch,
+    [rules.fetch, validate],
     (req: Request, res: Response) => controller.fetch(req, res)
   ),
 
-  like: productRouter.put(
-    '/like/:id',
-    auth.user,
-    (req: Request, res: Response) => controller.like(req, res)
-  ),
-
-  review: productRouter.put(
-    '/review/:id',
-    auth.user,
-    (req: Request, res: Response) => controller.review(req, res)
+  fetchAll: productRouter.get('/fetch/all', (req: Request, res: Response) =>
+    controller.fetchAll(req, res)
   ),
 };
 
