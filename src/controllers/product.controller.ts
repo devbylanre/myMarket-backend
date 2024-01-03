@@ -193,7 +193,10 @@ export const controller = {
   fetchAll: async (req: Request, res: Response) => {
     try {
       const query = req.query;
-      const products = await Product.find(query);
+
+      const products = await Product.find(query)
+        .sort((query.sort as any) || 1)
+        .limit(parseInt(query.limit as string) || 0);
 
       if (!products || products.length < 1) {
         return handleResponse.error({

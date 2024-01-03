@@ -45,7 +45,7 @@ const routes = {
     (req: Request, res: Response) => controller.fetch(req, res)
   ),
 
-  fetchAll: productRouter.get('/all', (req: Request, res: Response) =>
+  fetchAll: productRouter.get('/', (req: Request, res: Response) =>
     controller.fetchAll(req, res)
   ),
 };

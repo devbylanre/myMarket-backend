@@ -307,7 +307,7 @@ export const controller = {
       const { id } = req.params;
       const { store, ...data } = req.body;
 
-      if (!req.body) {
+      if (Object.keys(data).length === 0 && !store) {
         return handleResponse.error({
           res: res,
           status: 400,
@@ -348,7 +348,7 @@ export const controller = {
         res: res,
         status: 200,
         message: 'User data updated successfully',
-        data: { ...data, ...store },
+        data: { ...data, store },
       });
     } catch (error: any) {
       return handleResponse.error({
