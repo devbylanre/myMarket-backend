@@ -28,7 +28,7 @@
   },
   "scripts": {
     "dev": "nodemon dist/server.js",
-    "copy": "co:pyfiles -u 1 src/views/**/* dist",
+    "copy": "copyfiles -u 1 src/views/**/* dist",
     "build": "tsc",
     "tsc:watch": "tsc -w"
   }

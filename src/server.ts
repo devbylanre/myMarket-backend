@@ -25,7 +25,11 @@ app.use((req, res, next) => {
 });
 
 app.get('/', (req, res) => {
-  res.render('welcome.ejs', {});
+  res.render('welcome.ejs', {
+    subject: 'Welcome to Port 5000',
+    username: 'John doe',
+    verificationUrl: 'http://localhost:5000',
+  });
 });
 
 app.use(express.json());
