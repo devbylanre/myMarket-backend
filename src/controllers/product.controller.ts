@@ -195,10 +195,10 @@ export const controller = {
       const query = req.query;
 
       const products = await Product.find(query)
-        .sort((query.sort as any) || 1)
+        .sort((query.sort as any) || '1')
         .limit(parseInt(query.limit as string) || 0);
 
-      if (!products || products.length < 1) {
+      if (!products || products.length === 0) {
         return handleResponse.error({
           res: res,
           status: 404,
