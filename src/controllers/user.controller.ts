@@ -316,10 +316,10 @@ export const controller = {
       }
 
       // find user by id
-      const userExists = await User.findById(id);
+      const user = await User.findById(id);
 
       // check if user does not exists
-      if (!userExists) {
+      if (!user) {
         return handleResponse.error({
           res: res,
           status: 404,
@@ -348,7 +348,7 @@ export const controller = {
       // update user data
       const updatedUser = await User.findByIdAndUpdate(
         id,
-        { $set: { store: { ...store }, ...dataToUpdate } },
+        { store: { ...user.store, ...store }, ...dataToUpdate },
         { new: true, select: '-password -verification -otp' }
       );
 
