@@ -348,10 +348,7 @@ export const controller = {
       // update user data
       const updatedUser = await User.findByIdAndUpdate(
         id,
-        {
-          ...store,
-          ...dataToUpdate,
-        },
+        { $set: { ...store, ...dataToUpdate } },
         { new: true, select: '-password -verification -otp' }
       );
 
