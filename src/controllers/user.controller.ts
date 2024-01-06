@@ -307,7 +307,7 @@ export const controller = {
       const { id } = req.params;
       const { store, ...data } = req.body;
 
-      if (Object.keys(data).length === 0 && !store) {
+      if (Object.keys(data).length === 0 && Object.keys(store).length === 0) {
         return handleResponse.error({
           res: res,
           status: 400,
@@ -327,9 +327,10 @@ export const controller = {
         });
       }
 
-      if (store && store?.name) {
+      if (store && store.name) {
         const storeNameExists = await User.findOne({
           'store.name': store.name,
+          _id: { $ne: id },
         });
 
         if (storeNameExists) {
@@ -341,14 +342,24 @@ export const controller = {
         }
       }
 
+      // remove sensitive fields from the document
+      const { verification, password, email, otp, ...dataToUpdate } = data;
+
       // update user data
-      await User.findByIdAndUpdate(id, { ...store, ...data });
+      const updatedUser = await User.findByIdAndUpdate(
+        id,
+        {
+          ...store,
+          ...dataToUpdate,
+        },
+        { new: true, select: '-password -verification -otp' }
+      );
 
       return handleResponse.success({
         res: res,
         status: 200,
         message: 'User data updated successfully',
-        data: { ...data, store },
+        data: updatedUser,
       });
     } catch (error: any) {
       return handleResponse.error({
