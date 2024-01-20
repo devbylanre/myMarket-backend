@@ -38,7 +38,7 @@ app.use('/user', userRouter);
 app.use('/product', productRouter);
 
 mongoose
-  .connect(config.mongoDBDriver)
+  .connect('mongodb://127.0.0.1:27017/mymarket')
   .then(() => {
     app.listen(config.port, 'localhost', () =>
       console.log(`Welcome to port ${config.port} John Doe`)

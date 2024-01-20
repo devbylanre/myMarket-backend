@@ -1,4 +1,4 @@
-import mongoose from 'mongoose';
+import mongoose, { ObjectId, Types } from 'mongoose';
 import { User } from '../models/user.model';
 import { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
@@ -18,638 +18,310 @@ import {
   ref,
   uploadBytes,
 } from 'firebase/storage';
-import { handleResponse } from '../utils/res.util';
 
 const firebaseApp = initializeApp(config.firebase);
 const storage = getStorage(firebaseApp);
 
-const helper = {
-  hashPassword: (password: string) => {
+const create = async <T extends unknown>(req: Request, res: Response) => {
+  const { email, firstName, lastName, password } = req.body;
+
+  const emailExists = () => {
+    const check = User.findOne({ email: email });
+    return check;
+  };
+
+  const generateVerificationToken = () => {
+    return crypto.randomBytes(40).toString('hex');
+  };
+
+  const hashPassword = () => {
     const salt = bcrypt.genSaltSync(10);
     return bcrypt.hashSync(password, salt);
-  },
+  };
 
-  comparePassword: (password: string, encrypted: string) => {
-    return bcrypt.compareSync(password, encrypted);
-  },
+  const createNotification = (id: Types.ObjectId) => {
+    notification.create({
+      recipient: id,
+      content: `Welcome aboard, ${firstName} ${lastName}! 🚀 Get started with your personalized journey`,
+      type: 'sign-up',
+    });
+  };
 
-  generateNumbers: (length: number) => {
-    let num = '';
+  const sendMail = (token: string) => {
+    const name = firstName + ' ' + lastName;
+    const data = {
+      username: name,
+      subject: 'Welcome to myMarket',
+      verificationUrl: `https://shoponmymarket.netlify.app/verify?type=email&email=${email}&token=${token}`,
+    };
 
-    for (let i = 0; i < length; i++) {
-      const random = Math.floor(Math.random() * 10);
-      num += random.toString();
-    }
-
-    return num;
-  },
-
-  decodeJwt: (token: string) => {
-    return jwt.decode(token);
-  },
-
-  createJwt: (data: Record<string, any>, duration: string | number) => {
-    return jwt.sign(data, config.secret_key, { expiresIn: duration });
-  },
+    mailer.send({
+      to: email,
+      subject: 'Welcome to myMarket',
+      template: path.join(__dirname, '..', 'views', 'welcome.ejs'),
+      data: data,
+    });
+  };
 };
 
-//  controller
-export const controller = {
-  create: async (req: Request, res: Response) => {
-    try {
-      const data = req.body;
+const authenticate = (req: Request, res: Response) => {
+  const payload = req.body;
 
-      // find user by email
-      const emailExists = await User.findOne({
-        email: data.email,
+  const getUser = async () => {
+    await User.findOne({ email: payload.email })
+      .then((user) => {
+        return user;
+      })
+      .catch((error) => {
+        console.error(error);
+        return res.status(401).json();
       });
+  };
 
-      // check is user already exists
-      if (emailExists) {
-        return handleResponse.error({
-          res: res,
-          status: 403,
-          message: 'Email is already registered to another account',
-        });
-      }
-
-      // generate verification token
-      const verificationToken = crypto.randomBytes(40).toString('hex');
-
-      // generate an encrypted password
-      const password = helper.hashPassword(data.password);
-
-      // create user
-      const user = await User.create({
-        ...data,
-        password,
-        'verification.token': verificationToken,
-      });
-
-      // create a sign-up notification
-      await notification.create({
-        recipient: user._id,
-        content: `Welcome aboard, ${data.firstName} ${data.lastName}! 🚀 Get started with your personalized journey`,
-        type: 'sign-up',
-      });
-
-      await mailer.send({
-        to: data.email,
-        subject: 'Welcome to myMarket',
-        template: path.join(__dirname, '..', 'views', 'welcome.ejs'),
-        data: {
-          username: `${data.firstName} ${data.lastName}`,
-          subject: 'Welcome to myMarket',
-          verificationUrl: `https://shoponmymarket.netlify.app/email/verify?email=${data.email}&token=${verificationToken}`,
-        },
-      });
-
-      return handleResponse.success({
-        res: res,
-        status: 201,
-        message: 'User registration successful',
-        data: null,
-      });
-    } catch (error: any) {
-      return handleResponse.error({
-        res: res,
-        status: 500,
-        message: error.message,
-      });
+  const isUserVerified = async (isVerified: boolean) => {
+    if (!isVerified) {
     }
-  },
+  };
 
-  authenticate: async function (req: Request, res: Response) {
-    try {
-      const auth = req.body;
+  const passwordMatch = (encrypted: string) => {
+    const isMatch = bcrypt.compareSync(payload.password, encrypted);
+    return isMatch;
+  };
 
-      // find the user
-      const user = await User.findOne({ email: auth.email });
+  const generateToken = (id: string) => {
+    const token = jwt.sign({ id: id }, config.secret_key, { expiresIn: '31d' });
+    return token;
+  };
 
-      // check if user does not exist
-      if (!user) {
-        return handleResponse.error({
-          res: res,
-          status: 404,
-          message: 'User does not exist',
-        });
-      }
+  const tokenExpirationDate = (token: string) => {
+    const data = jwt.decode(token);
+    return data ? (data as Record<string, any>).exp : null;
+  };
+};
 
-      // check if user is verified
-      if (!user.verification.isVerified) {
-        return handleResponse.error({
-          res: res,
-          status: 403,
-          message:
-            'User is not verified, Check your email for verification link',
-        });
-      }
+const verify = (req: Request, res: Response) => {
+  const { token } = req.body;
 
-      // verify password
-      const isPasswordMatch = helper.comparePassword(
-        auth.password,
-        user.password
-      );
-
-      // check if password does not match
-      if (!isPasswordMatch) {
-        return handleResponse.error({
-          res: res,
-          status: 401,
-          message: 'Password does not match',
-        });
-      }
-
-      const token = helper.createJwt({ id: user._id }, '24d');
-
-      const { exp } = helper.decodeJwt(token) as Record<string, any>;
-
-      const { password, otp, verification, ...data } = user.toObject();
-
-      return handleResponse.success({
-        res: res,
-        status: 200,
-        message: 'User authentication successful',
-        data: { ...data, token: { id: token, exp: exp } },
-      });
-    } catch (error: any) {
-      return handleResponse.error({
-        res: res,
-        status: 500,
-        message: error.message,
-      });
-    }
-  },
-
-  verify: async function (req: Request, res: Response) {
-    try {
-      const { email } = req.body;
-
-      // find user by email
-      const user = await User.findOne({ email: email });
-
-      // check if user does not exist
-      if (!user) {
-        return handleResponse.error({
-          res: res,
-          status: 404,
-          message: 'User does not exist',
-        });
-      }
-
-      const { verification, otp, password, ...data } = user.toObject();
-
-      return handleResponse.success({
-        res: res,
-        status: 200,
-        message: 'User verification successful',
-        data: data,
-      });
-    } catch (error: any) {
-      return handleResponse.error({
-        res: res,
-        status: 500,
-        message: error.message,
-      });
-    }
-  },
-
-  fetch: async function (req: Request, res: Response) {
-    try {
-      const { id } = req.params;
-
-      // find user by id
-      const user = await User.findById(id);
-
-      // check if user does not exist
-      if (!user) {
-        return handleResponse.error({
-          res: res,
-          status: 404,
-          message: 'User not found',
-        });
-      }
-
-      const { password, verification, otp, ...data } = user.toObject();
-
-      return handleResponse.success({
-        res: res,
-        status: 200,
-        message: 'User data fetched successfully',
-        data: { ...data },
-      });
-    } catch (error: any) {
-      return handleResponse.error({
-        res: res,
-        status: 500,
-        message: error.message,
-      });
-    }
-  },
-
-  fetchProducts: async (req: Request, res: Response) => {
-    try {
-      const { id } = req.params;
-
-      const user = await User.findById(id);
-
-      if (!user) {
-        return handleResponse.error({
-          res: res,
-          status: 404,
-          message: 'User not found',
-        });
-      }
-
-      const query = await User.aggregate([
-        { $match: { _id: new mongoose.Types.ObjectId(id) } },
-        {
-          $lookup: {
-            from: 'products',
-            localField: '_id',
-            foreignField: 'user',
-            as: 'products',
-          },
-        },
-        {
-          $project: {
-            products: 1,
-            _id: 0,
-          },
-        },
-      ]);
-
-      if (!query[0].products || query[0].products.length === 0) {
-        return handleResponse.error({
-          res: res,
-          status: 404,
-          message: 'No products was found',
-        });
-      }
-
-      return handleResponse.success({
-        res: res,
-        status: 200,
-        message: 'Products found',
-        data: query[0].products,
-      });
-    } catch (error: any) {
-      return handleResponse.error({
-        res: res,
-        status: 500,
-        message: error.message,
-      });
-    }
-  },
-
-  update: async (req: Request, res: Response) => {
-    try {
-      const { id } = req.params;
-      const { store, ...data } = req.body;
-
-      if (Object.keys(data).length === 0 && Object.keys(store).length === 0) {
-        return handleResponse.error({
-          res: res,
-          status: 400,
-          message: 'No data to update',
-        });
-      }
-
-      // find user by id
-      const user = await User.findById(id);
-
-      // check if user does not exists
-      if (!user) {
-        return handleResponse.error({
-          res: res,
-          status: 404,
-          message: 'Cannot update user that does not exist',
-        });
-      }
-
-      if (store && store.name) {
-        const storeNameExists = await User.findOne({
-          'store.name': store.name,
-          _id: { $ne: id },
-        });
-
-        if (storeNameExists) {
-          return handleResponse.error({
-            res: res,
-            status: 400,
-            message: 'Store name is already taken',
-          });
+  const getID = () => {
+    let id: unknown = null;
+    const check = jwt.verify(
+      token,
+      config.secret_key,
+      (error: unknown, data: unknown) => {
+        if (error) {
         }
+
+        id = (data as Record<string, any>).id;
       }
+    );
 
-      // remove sensitive fields from the document
-      const { verification, password, email, otp, ...dataToUpdate } = data;
+    return check;
+  };
 
-      // update user data
-      const updatedUser = await User.findByIdAndUpdate(
-        id,
-        { store: { ...user.store, ...store }, ...dataToUpdate },
-        { new: true, select: '-password -verification -otp' }
-      );
+  const getUser = async (id: string) => {
+    const user = await User.findById(id);
+    return user;
+  };
+};
 
-      return handleResponse.success({
-        res: res,
-        status: 200,
-        message: 'User data updated successfully',
-        data: updatedUser,
-      });
-    } catch (error: any) {
-      return handleResponse.error({
-        res: res,
-        status: 500,
-        message: 'Unable to update user data',
-      });
+const fetch = async (req: Request, res: Response) => {
+  const { token } = req.body;
+
+  const getID = () => {};
+
+  const getUser = async (id: string) => {
+    const user = await User.findById(id);
+    return user;
+  };
+};
+
+const update = async (req: Request, res: Response) => {
+  const { token, ...payload } = req.body;
+
+  const getID = () => {};
+
+  const storeExist = async (name: string) => {
+    const check = await User.findOne({ 'store.name': name });
+  };
+
+  const updateUser = async (id: string) => {
+    const query = await User.findByIdAndUpdate(id, payload);
+  };
+};
+
+const uploadPhoto = async (req: Request, res: Response) => {
+  const file = req.file;
+  const { token } = req.body;
+
+  if (!file) {
+    return;
+  }
+
+  const getID = () => {};
+
+  const getUser = async (id: string) => {
+    const user = await User.findById(id);
+  };
+
+  const encrypt = (id: string) => {
+    const data = `${id}-${Date.now()}${path.extname(file.originalname)}`;
+    return data;
+  };
+
+  const deletePhoto = async (name: string) => {
+    if (name) {
+      const photo = ref(storage, `/photos/${name}`);
+      await deleteObject(photo);
     }
-  },
+  };
 
-  uploadPhoto: async (req: Request, res: Response) => {
-    try {
-      const file = req.file;
-      const { email } = req.body;
+  const storePhoto = async (encrypted: string) => {
+    const photo = ref(storage, `photos/${encrypted}`);
+    const snapshot = await uploadBytes(photo, file.buffer);
+    const url = getDownloadURL(snapshot.ref);
+  };
+};
 
-      if (!file) {
-        return handleResponse.error({
-          res: res,
-          status: 400,
-          message: 'No file specified',
-        });
-      }
+const products = async (req: Request, res: Response) => {
+  const { token } = req.body;
 
-      const user = await User.findOne({ email: email });
+  const getID = () => {};
 
-      if (!user) {
-        return handleResponse.error({
-          res: res,
-          status: 404,
-          message: 'User does not exist',
-        });
-      }
+  const products = async () => {};
+};
 
-      const encrypted =
-        user._id + '-' + Date.now() + path.extname(file.originalname);
-      const storageRef = ref(storage, `photos/${encrypted}`);
+const verifyEmail = async (req: Request, res: Response) => {
+  const { email, token } = req.body;
 
-      if (user.photo.name) {
-        const deleteRef = ref(storage, `/photos/${user.photo.name}`);
-        await deleteObject(deleteRef);
-      }
+  const getID = () => {};
 
-      const snapshot = await uploadBytes(storageRef, file.buffer);
-      const url = await getDownloadURL(snapshot.ref);
+  const isVerified = (storedToken: string, token: string) => {
+    const check = storedToken === token;
+    return check;
+  };
 
-      const update = await User.findByIdAndUpdate(
-        user._id,
-        { photo: { url: url, name: encrypted } },
-        { new: true }
-      );
+  const updateUser = async (id: string) => {
+    const update = await User.findByIdAndUpdate(id, {});
+  };
 
-      return handleResponse.success({
-        res: res,
-        status: 200,
-        message: 'Photo uploaded successfully',
-        data: { ...update?.photo },
-      });
-    } catch (error: any) {
-      return handleResponse.error({
-        res: res,
-        status: 500,
-        message: error.message,
-      });
+  const getUser = async (id: string) => {
+    const user = await User.findById(id);
+  };
+};
+
+const changeEmail = async (req: Request, res: Response) => {
+  const { email, token } = req.body;
+
+  const getID = () => {};
+
+  const getUser = async (id: string) => {
+    const user = await User.findById(id);
+  };
+
+  const changeEmail = async (id: string, email: string) => {
+    const change = await User.findByIdAndUpdate(id, { email: email });
+  };
+};
+
+const changePassword = async (req: Request, res: Response) => {
+  const isPasswordMatch = (password: string, encrypted: string) => {
+    const match = bcrypt.compareSync(password, encrypted);
+    return match;
+  };
+
+  const encryptNewPassword = (password: string) => {
+    const salt = bcrypt.genSaltSync(10);
+    const encrypt = bcrypt.hashSync(password, 10);
+    return encrypt;
+  };
+
+  const update = async (id: string, encrypted: string) => {
+    const user = await User.findByIdAndDelete(id, { password: encrypted });
+  };
+};
+
+const generateOneTimePassword = async (req: Request, res: Response) => {
+  const {} = req.body;
+
+  const getUser = async () => {};
+
+  const oneTimePassword = () => {
+    let token = '';
+
+    for (let i = 0; i < 6; i++) {
+      const randomNumber = Math.floor(Math.random() * 10);
+      // token[i] += randomNumber; error storing index in token
     }
-  },
 
-  verifyEmail: async (req: Request, res: Response) => {
-    try {
-      const { email, token } = req.body;
+    return token;
+  };
 
-      const user = await User.findOne({ email: email });
+  const storeOneTimePassword = async (id: string, token: string) => {
+    const store = await User.findByIdAndUpdate(id, {});
+  };
+};
 
-      if (!user) {
-        return handleResponse.error({
-          res: res,
-          status: 404,
-          message: 'User does not exist',
-        });
-      }
+const verifyOneTimePassword = async (req: Request, res: Response) => {
+  const { otp } = req.body;
 
-      if (user.verification.token !== token) {
-        return handleResponse.error({
-          res: res,
-          status: 401,
-          message: 'Invalid email verification token',
-        });
-      }
+  const getUser = async () => {};
 
-      await User.findByIdAndUpdate(user._id, {
-        'verification.token': '',
-        'verification.isVerified': true,
-      });
+  const verify = (otp: string, storedOtp: string) => {
+    const check = otp === storedOtp;
+    return check;
+  };
 
-      return handleResponse.success({
-        res: res,
-        status: 200,
-        message: 'Email verification successful',
-        data: null,
-      });
-    } catch (error: any) {
-      return handleResponse.error({
-        res: res,
-        status: 500,
-        message: error.message,
-      });
-    }
-  },
+  const update = async (id: string) => {
+    const run = await User.findByIdAndUpdate(id, {});
+  };
+};
 
-  changeEmail: async function (req: Request, res: Response) {
-    try {
-      const { email, newEmail, password } = req.body;
+const followUser = async (req: Request, res: Response) => {
+  const { token, id } = req.body;
 
-      const user = await User.findOne({ email: email });
+  const getUser = async () => {};
 
-      if (!user) {
-        return handleResponse.error({
-          res: res,
-          status: 404,
-          message: 'User does not exist',
-        });
-      }
+  const isAlreadyFollowed = (id: string, followers: string[]) => {
+    const check = followers.includes(id);
+    return check;
+  };
 
-      const isMatch = helper.comparePassword(password, user.password);
+  const follow = (id: string, followers: string[]) => {
+    const newFollowers = [...followers, id];
+    return newFollowers;
+  };
 
-      if (!isMatch) {
-        return handleResponse.error({
-          res: res,
-          status: 401,
-          message: 'Incorrect password',
-        });
-      }
+  const unFollow = (id: string, followers: string[]) => {
+    const filter = followers.filter((user) => user !== id);
+    return filter;
+  };
 
-      await User.findByIdAndUpdate(user._id, { email: newEmail });
+  const update = async (id: string, data: string[]) => {
+    const query = await User.findByIdAndUpdate(id, { followers: data });
+  };
+};
 
-      return handleResponse.success({
-        res: res,
-        status: 200,
-        message: 'Email changed successfully',
-        data: { email: newEmail },
-      });
-    } catch (error: any) {
-      return handleResponse.error({
-        res: res,
-        status: 500,
-        message: error.message,
-      });
-    }
-  },
+const storeProduct = async (req: Request, res: Response) => {
+  const {} = req.body;
 
-  changePassword: async function (req: Request, res: Response) {
-    try {
-      const { email, password } = req.body;
+  const getUser = async () => {};
 
-      const user = await User.findOne({ email: email });
+  const productExists = (id: string, products: string[]) => {
+    const check = products.includes(id);
+    return check;
+  };
 
-      if (!user) {
-        return handleResponse.error({
-          res: res,
-          status: 404,
-          message: 'User does not exist',
-        });
-      }
+  const addProducts = (id: string, products: string[]) => {
+    const newProducts = [...products, id];
+    return newProducts;
+  };
 
-      const isMatch = helper.comparePassword(password.old, user.password);
+  const removeProducts = (id: string, products: string[]) => {
+    const filter = products.filter((product) => product !== id);
+    return filter;
+  };
 
-      if (!isMatch) {
-        return handleResponse.error({
-          res: res,
-          status: 401,
-          message: 'Your previous password is incorrect',
-        });
-      }
-
-      await User.findByIdAndUpdate(user._id, {
-        password: helper.hashPassword(password.new),
-      });
-
-      return handleResponse.success({
-        res: res,
-        status: 200,
-        message: 'Password updated successfully',
-        data: null,
-      });
-    } catch (error: any) {
-      return handleResponse.error({
-        res: res,
-        status: 500,
-        message: error.message,
-      });
-    }
-  },
-
-  generateOTP: async function (req: Request, res: Response) {
-    try {
-      const { email } = req.body;
-
-      // find user by id
-      const user = await User.findOne({ email: email });
-
-      // check if user does not exist
-      if (!user) {
-        return handleResponse.error({
-          res: res,
-          status: 404,
-          message: 'User does not exist',
-        });
-      }
-
-      // generate token
-      const code = helper.generateNumbers(6);
-      const expiresAt = new Date().setTime(new Date().getTime() + 900000); // 15 minutes
-
-      // update user data
-      await User.findByIdAndUpdate(user._id, {
-        'otp.code': code,
-        'otp.expiresAt': expiresAt,
-      });
-
-      return handleResponse.success({
-        res: res,
-        status: 200,
-        message: 'OTP generated successfully',
-        data: { otp: { code, expiresAt } },
-      });
-    } catch (error: any) {
-      return handleResponse.error({
-        res: res,
-        status: 500,
-        message: error.message,
-      });
-    }
-  },
-
-  verifyOTP: async function (req: Request, res: Response) {
-    try {
-      const { email, code } = req.body;
-
-      // find user
-      const user = await User.findOne({ email: email });
-
-      // check if user exists
-      if (!user) {
-        return handleResponse.error({
-          res: res,
-          status: 404,
-          message: 'User does not exist',
-        });
-      }
-
-      // check if token exist
-      if (!user.otp.code) {
-        return handleResponse.error({
-          res: res,
-          status: 401,
-          message: 'No One Time Password was found',
-        });
-      }
-
-      // check if the user token key matches the provided key
-      if (user.otp.code !== code) {
-        return handleResponse.error({
-          res: res,
-          status: 400,
-          message: 'Invalid One Time Password',
-        });
-      }
-
-      // check if current time is greater than the token expiration time
-      if (user.otp.expiresAt < Date.now()) {
-        return handleResponse.error({
-          res: res,
-          status: 400,
-          message: 'One Time Password has expired',
-        });
-      }
-
-      await User.findByIdAndUpdate(user._id, {
-        'otp.code': '',
-        'otp.expiresAt': 0,
-      });
-
-      return handleResponse.success({
-        res: res,
-        status: 200,
-        message: 'One Time Password has been verified',
-        data: null,
-      });
-    } catch (error: any) {
-      return handleResponse.error({
-        res: res,
-        status: 500,
-        message: error.message,
-      });
-    }
-  },
+  const update = async (id: string, data: string[]) => {
+    const query = await User.findByIdAndUpdate(id, { saved: data });
+  };
 };

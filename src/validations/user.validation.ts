@@ -142,7 +142,7 @@ const validate = (req: Request, res: Response, next: NextFunction) => {
     return handleResponse.error({
       res: res,
       status: 422,
-      message: errors.array(),
+      message: errors.array().forEach((error, i) => i === 0 && error.msg),
     });
   }
 

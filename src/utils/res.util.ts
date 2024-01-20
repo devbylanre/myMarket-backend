@@ -1,26 +1,31 @@
 import { Response } from 'express';
 
-interface ISuccessResponse {
+interface SuccessResponse<T> {
   res: Response;
   status: number;
-  message: Record<string, any>[] | string;
-  data: Record<string, any> | Record<string, any>[] | null;
+  message: string;
+  data: T;
 }
 
-interface IErrorResponse {
+interface ErrorResponse<T> {
   res: Response;
   status: number;
-  message: Record<string, any>[] | string;
+  message: T;
 }
 
 export const handleResponse = {
-  success: ({ res, status, message, data }: ISuccessResponse) => {
+  success: <T extends unknown>({
+    res,
+    status,
+    message,
+    data,
+  }: SuccessResponse<T>) => {
     return res
       .status(status)
       .json({ status: 'success', message: message, data: data, code: status });
   },
 
-  error: ({ res, status, message }: IErrorResponse) => {
+  error: <T extends unknown>({ res, status, message }: ErrorResponse<T>) => {
     return res
       .status(status)
       .json({ status: 'error', message: message, code: status });
