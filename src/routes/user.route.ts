@@ -1,6 +1,6 @@
 import { Request, Response, Router } from 'express';
 import { rules } from '../validations/user.validation';
-import { useUpload } from '../utils/useUpload';
+import { useUpload } from '../lib/useUpload';
 
 import { createUser } from '../controllers/user.controller';
 

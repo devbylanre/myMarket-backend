@@ -7,9 +7,10 @@ export const usePassword = () => {
     return hash;
   };
 
-  const decode = (password: string, encrypted: string) => {
+  const isMatch = (password: string, encrypted: string) => {
     const result = bcrypt.compareSync(password, encrypted);
+    return result;
   };
 
-  return { encrypt, decode };
+  return { encrypt, isMatch };
 };

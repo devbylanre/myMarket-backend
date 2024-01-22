@@ -1,5 +1,4 @@
 import { validationResult } from 'express-validator';
-import { handleResponse } from '../utils/res.util';
 import { Request, Response } from 'express';
 import { IProduct, Product } from '../models/product.model';
 
@@ -14,7 +13,7 @@ import {
 } from 'firebase/storage';
 
 // config file
-import { config } from '../config';
+import config from '../config';
 import path from 'path';
 import mongoose from 'mongoose';
 

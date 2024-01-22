@@ -1,6 +1,5 @@
 import { Request, Response, Router } from 'express';
 import multer from 'multer';
-import { rules, validate } from '../validations/product.validation';
 
 const productRouter = Router();
 

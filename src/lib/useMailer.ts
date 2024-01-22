@@ -1,7 +1,6 @@
 import nodemailer from 'nodemailer';
-import { config } from '../config';
+import config from '../config';
 import ejs, { Data } from 'ejs';
-import { response } from 'express';
 
 export type Mailer<T extends unknown> = {
   recipient: string;

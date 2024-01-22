@@ -1,36 +1,48 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt, { JwtPayload } from 'jsonwebtoken';
-import { config } from '../config';
+import config from '../config';
 import { Types } from 'mongoose';
+import { useToken } from '../lib/useToken';
+import { useResponse } from '../lib/useResponse';
 
-type Auth = Request & {
+export type AuthRequest = Request & {
   user: Types.ObjectId;
 };
 
 export const useAuth = () => {
-  const auth = (req: Auth, res: Response, next: NextFunction) => {
-    const token = req.headers.authorization?.split(' ')[1];
+  const auth = (
+    { user, headers: { authorization } }: AuthRequest,
+    res: Response,
+    next: NextFunction
+  ) => {
+    const { verify } = useToken();
+    const { response } = useResponse(res);
 
-    if (!token) {
-      return;
-    }
+    try {
+      const token = authorization?.split(' ')[1];
 
-    const verify = () => {
-      const check = jwt.verify(token, config.secretKey, (error, data) => {
-        if (error) {
-        }
+      // check if token is empty
+      if (!token) {
+        return response({
+          type: 'ERROR',
+          code: 400,
+          message: 'Authorization token is required',
+        });
+      }
 
-        const hasExpired = Date.now() > (data as JwtPayload).exp! * 1000;
-        if (hasExpired) {
-        }
+      // verify token
+      const payload = verify(token);
+      user = payload.id; // assign payload.id to req.user
 
-        req.user = (data as JwtPayload).id;
+      // go to the next function
+      next();
+    } catch (error) {
+      return response({
+        type: 'ERROR',
+        code: 500,
+        message: (error as Error).message,
       });
-      return;
-    };
-
-    verify();
-    next();
+    }
   };
 
   return { auth };
