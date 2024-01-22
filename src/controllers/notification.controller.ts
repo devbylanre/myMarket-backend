@@ -3,8 +3,8 @@ import { Notification, NotificationProps } from '../models/notification.model';
 import { useResponse } from '../lib/useResponse';
 
 const createNotification = async (data: NotificationProps) => {
-  const notification = new Notification(data);
-  return await notification.save();
+  const doc = Notification.create(data);
+  return await doc;
 };
 
 const readNotification = async (req: Request, res: Response) => {

@@ -1,10 +1,8 @@
-import { Request, Response, Router } from 'express';
-import { rules } from '../validations/user.validation';
+import { Router } from 'express';
 import { useUpload } from '../lib/useUpload';
-
-import { createUser } from '../controllers/user.controller';
 import { useValidate } from '../lib/useValidate';
-import { NextFunction } from 'express-serve-static-core';
+import { rules } from '../validations/user.validation';
+import { authenticateUser, createUser } from '../controllers/user.controller';
 
 const userRouter = Router();
 
@@ -12,13 +10,8 @@ const userRouter = Router();
 const { upload } = useUpload();
 const { validate } = useValidate();
 
-userRouter.post(
-  '/create',
-  rules.create,
-  validate,
-  (req: Request, res: Response, next: NextFunction) => {
-    createUser(req, res);
-  }
-);
+userRouter.post('/create', rules.create, validate, createUser);
+
+userRouter.post('/auth', rules.authentication, validate, authenticateUser);
 
 export default userRouter;

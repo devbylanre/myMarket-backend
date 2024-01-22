@@ -1,6 +1,6 @@
 import mongoose, { ObjectId, Types } from 'mongoose';
 import { User } from '../models/user.model';
-import { Request, Response } from 'express';
+import { Request, Response, response } from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
@@ -20,6 +20,7 @@ import {
 } from 'firebase/storage';
 import { useResponse } from '../lib/useResponse';
 import { usePassword } from '../lib/usePassword';
+import { useToken } from '../lib/useToken';
 
 const firebaseApp = initializeApp(config.firebase);
 const storage = getStorage(firebaseApp);
@@ -39,7 +40,7 @@ const createUser = async (
 
   // create a notification doc for the process
   const signUpNotification = async (id: Types.ObjectId) => {
-    await createNotification({
+    return await createNotification({
       type: 'SIGN_UP',
       recipient: id,
       message: `Welcome aboard, ${firstName} ${lastName}! 🚀 Get started with your personalized journey`,
@@ -47,8 +48,8 @@ const createUser = async (
   };
 
   // send a mail to the user
-  const sendAnEMail = (token: string) => {
-    return mail({
+  const sendEmail = async (token: string) => {
+    return await mail({
       recipient: email,
       subject: 'Welcome to myMarket',
       path: path.join(__dirname, '..', 'views', 'welcome.ejs'),
@@ -88,7 +89,7 @@ const createUser = async (
 
     const newUser = await createUser(token, encryptedPassword);
     const notification = await signUpNotification(newUser._id);
-    const mail = sendAnEMail(token);
+    const mail = await sendEmail(token);
 
     return response({
       type: 'SUCCESS',
@@ -105,39 +106,44 @@ const createUser = async (
   }
 };
 
-const authenticate = (req: Request, res: Response) => {
-  const payload = req.body;
+const authenticateUser = async ({ body }: Request, res: Response) => {
+  const { isMatch } = usePassword();
+  const { sign, expire } = useToken();
+  const { response } = useResponse(res);
 
-  const getUser = async () => {
-    await User.findOne({ email: payload.email })
-      .then((user) => {
-        return user;
-      })
-      .catch((error) => {
-        console.error(error);
-        return res.status(401).json();
-      });
-  };
+  const user = await User.findOne({ email: body.email });
 
-  const isUserVerified = async (isVerified: boolean) => {
-    if (!isVerified) {
-    }
-  };
+  // check if user was found
+  if (!user) {
+    return response({
+      type: 'ERROR',
+      code: 404,
+      message: 'User account not found',
+    });
+  }
 
-  const passwordMatch = (encrypted: string) => {
-    const isMatch = bcrypt.compareSync(payload.password, encrypted);
-    return isMatch;
-  };
+  const passwordMatch = isMatch(body.password, user.password);
 
-  const generateToken = (id: string) => {
-    const token = jwt.sign({ id: id }, config.secretKey, { expiresIn: '31d' });
-    return token;
-  };
+  // check if password matches
+  if (!passwordMatch) {
+    return response({
+      type: 'ERROR',
+      code: 401,
+      message: 'Password does not match',
+    });
+  }
 
-  const tokenExpirationDate = (token: string) => {
-    const data = jwt.decode(token);
-    return data ? (data as Record<string, any>).exp : null;
-  };
+  const token = sign({ id: user._id }, '24d');
+  const expiresAt = expire(token);
+
+  const { otp, verification, password, ...data } = user.toObject();
+
+  return response({
+    type: 'SUCCESS',
+    code: 200,
+    message: 'User authentication successful',
+    data: { ...data, session: { token, expiresAt } },
+  });
 };
 
 const verify = (req: Request, res: Response) => {
@@ -367,4 +373,4 @@ const storeProduct = async (req: Request, res: Response) => {
   };
 };
 
-export { createUser };
+export { createUser, authenticateUser };

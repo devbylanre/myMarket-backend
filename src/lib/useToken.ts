@@ -14,13 +14,22 @@ export const useToken = () => {
     return result;
   };
 
+  const expire = (token: string) => {
+    const result = decode(token) as JwtPayload;
+    return result.exp;
+  };
+
+  const isExpired = (expire: number) => {
+    const check = Date.now() > expire * 1000;
+    return check;
+  };
+
   const verify = (token: string) => {
     try {
       const payload = jwt.verify(token, secretKey) as JwtPayload;
+      const check = isExpired(payload.exp!);
 
-      const isExpired = Date.now() > payload.exp! * 1000;
-
-      if (isExpired) {
+      if (check) {
         throw new Error('Token has expired');
       }
 
@@ -30,5 +39,5 @@ export const useToken = () => {
     }
   };
 
-  return { sign, decode, verify };
+  return { sign, decode, expire, isExpired, verify };
 };

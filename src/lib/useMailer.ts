@@ -32,16 +32,12 @@ export const useMailer = () => {
       html: template,
     };
 
-    const mail = await transporter
-      .sendMail(mailOptions)
-      .then((response) => {
-        return response;
-      })
-      .catch((error: Error) =>
-        console.error('Failed to send mail', error.message)
-      );
-
-    return mail;
+    try {
+      const mail = await transporter.sendMail(mailOptions);
+      return mail;
+    } catch (error) {
+      throw new Error('Unable to send mail ' + (error as Error).message);
+    }
   };
 
   return { mail };
