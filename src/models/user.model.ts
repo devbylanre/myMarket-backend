@@ -1,64 +1,8 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
-interface MobileProps {
-  country: string;
-  code: number;
-  number: number;
-}
-
-interface BillingProps {
-  country: string;
-  state: string;
-  city: string;
-  address: string;
-}
-
-interface StoreProps {
-  name: string;
-  description: string;
-  location: BillingProps;
-}
-
-interface OTPProps {
-  code: string;
-  expiresAt: number;
-}
-
-interface AccountProps {
-  platform: string;
-  url: string;
-}
-
-interface verificationProps {
-  token: string;
-  isVerified: boolean;
-}
-
-interface PhotoProps {
-  url: string;
-  name: string;
-}
-export interface UserProps extends Document {
-  isSeller: boolean;
-  balance: number;
-  firstName: string;
-  lastName: string;
-  bio: string;
-  password: string;
-  email: string;
-  mobile: MobileProps;
-  billing: BillingProps;
-  store: StoreProps;
-  otp: OTPProps;
-  accounts: AccountProps[];
-  verification: verificationProps;
-  photo: PhotoProps;
-}
-
-const userSchema = new Schema<UserProps>(
+const userSchema = new Schema(
   {
-    isSeller: { type: Boolean, default: false },
-    balance: { type: Number, default: 0.0 },
+    role: { type: String, default: 'buyer' },
     firstName: { type: String, required: true },
     lastName: { type: String, required: true },
     email: { type: String, required: true, unique: true },
@@ -69,12 +13,12 @@ const userSchema = new Schema<UserProps>(
       isVerified: { type: Boolean, default: false },
     },
     mobile: {
-      country: { type: String, default: 'Nigeria' },
+      country: { type: String, default: '' },
       code: { type: Number, default: 234 },
       number: { type: Number, default: 0 },
     },
     billing: {
-      country: { type: String, default: 'Nigeria' },
+      country: { type: String, default: '' },
       state: { type: String, default: '' },
       city: { type: String, default: '' },
       address: { type: String, default: '' },
@@ -84,7 +28,7 @@ const userSchema = new Schema<UserProps>(
       description: { type: String, default: '' },
       followers: [{ type: Schema.Types.ObjectId }],
       location: {
-        country: { type: String, default: 'Nigeria' },
+        country: { type: String, default: '' },
         state: { type: String, default: '' },
         city: { type: String, default: '' },
         address: { type: String, default: '' },
@@ -94,13 +38,18 @@ const userSchema = new Schema<UserProps>(
       code: { type: String, default: '' },
       expiresAt: { type: Number, default: 0 },
     },
-    accounts: [{ platform: { type: String }, url: { type: String } }],
+    accounts: [
+      {
+        platform: { type: String },
+        url: { type: String },
+      },
+    ],
     photo: {
-      url: { type: String, default: '' },
       name: { type: String, default: '' },
+      url: { type: String, default: '' },
     },
   },
   { timestamps: true }
 );
 
-export const User = mongoose.model<UserProps>('user', userSchema);
+export const User = mongoose.model('user', userSchema);

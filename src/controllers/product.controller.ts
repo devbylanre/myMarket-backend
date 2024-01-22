@@ -2,7 +2,6 @@ import { validationResult } from 'express-validator';
 import { handleResponse } from '../utils/res.util';
 import { Request, Response } from 'express';
 import { IProduct, Product } from '../models/product.model';
-import { IAuthRequest } from '../middlewares/auth.middleware';
 
 // firebase
 import { initializeApp } from 'firebase/app';
@@ -22,202 +21,202 @@ import mongoose from 'mongoose';
 const firebaseApp = initializeApp(config.firebase);
 const storage = getStorage(firebaseApp);
 
-export const controller = {
-  create: async (req: IAuthRequest, res: Response) => {
-    try {
-      const data = req.body;
-      const images = req.files as Express.Multer.File[];
+// export const controller = {
+//   create: async (req: IAuthRequest, res: Response) => {
+//     try {
+//       const data = req.body;
+//       const images = req.files as Express.Multer.File[];
 
-      if (!images) {
-        return handleResponse.error({
-          res: res,
-          status: 400,
-          message: 'At least one image is required to create a product',
-        });
-      }
+//       if (!images) {
+//         return handleResponse.error({
+//           res: res,
+//           status: 400,
+//           message: 'At least one image is required to create a product',
+//         });
+//       }
 
-      const uploadedImages: { name: string; url: string }[] = [];
+//       const uploadedImages: { name: string; url: string }[] = [];
 
-      const uploadImages = images!.map(async (file: Express.Multer.File) => {
-        const encrypted = `${
-          path.parse(file.originalname).name
-        }-${Date.now().toString()}${path.extname(file.originalname)}`;
+//       const uploadImages = images!.map(async (file: Express.Multer.File) => {
+//         const encrypted = `${
+//           path.parse(file.originalname).name
+//         }-${Date.now().toString()}${path.extname(file.originalname)}`;
 
-        const fileRef = ref(storage, `products/images/${encrypted}`);
-        await uploadBytes(fileRef, file.buffer);
+//         const fileRef = ref(storage, `products/images/${encrypted}`);
+//         await uploadBytes(fileRef, file.buffer);
 
-        const imageUrl = await getDownloadURL(fileRef);
+//         const imageUrl = await getDownloadURL(fileRef);
 
-        uploadedImages.push({ name: encrypted, url: imageUrl });
-      });
+//         uploadedImages.push({ name: encrypted, url: imageUrl });
+//       });
 
-      await Promise.all(uploadImages);
+//       await Promise.all(uploadImages);
 
-      const product = await Product.create({
-        ...data,
-        images: uploadedImages,
-        user: req.user,
-      });
+//       const product = await Product.create({
+//         ...data,
+//         images: uploadedImages,
+//         user: req.user,
+//       });
 
-      return handleResponse.success({
-        res: res,
-        status: 201,
-        message: 'Product created successfully',
-        data: product,
-      });
-    } catch (error: any) {
-      return handleResponse.error({
-        res: res,
-        status: 500,
-        message: error.message,
-      });
-    }
-  },
+//       return handleResponse.success({
+//         res: res,
+//         status: 201,
+//         message: 'Product created successfully',
+//         data: product,
+//       });
+//     } catch (error: any) {
+//       return handleResponse.error({
+//         res: res,
+//         status: 500,
+//         message: error.message,
+//       });
+//     }
+//   },
 
-  update: async (req: IAuthRequest, res: Response) => {
-    try {
-      const data = req.body;
-      const { id } = req.params;
+//   update: async (req: IAuthRequest, res: Response) => {
+//     try {
+//       const data = req.body;
+//       const { id } = req.params;
 
-      const product = await Product.findByIdAndUpdate(id, data);
+//       const product = await Product.findByIdAndUpdate(id, data);
 
-      if (!product) {
-        return handleResponse.error({
-          res: res,
-          status: 404,
-          message: 'Product not found',
-        });
-      }
+//       if (!product) {
+//         return handleResponse.error({
+//           res: res,
+//           status: 404,
+//           message: 'Product not found',
+//         });
+//       }
 
-      return handleResponse.success({
-        res: res,
-        status: 200,
-        message: 'Product updated successfully',
-        data: data,
-      });
-    } catch (error: any) {
-      return handleResponse.error({
-        res: res,
-        status: 500,
-        message: error.message,
-      });
-    }
-  },
+//       return handleResponse.success({
+//         res: res,
+//         status: 200,
+//         message: 'Product updated successfully',
+//         data: data,
+//       });
+//     } catch (error: any) {
+//       return handleResponse.error({
+//         res: res,
+//         status: 500,
+//         message: error.message,
+//       });
+//     }
+//   },
 
-  delete: async (req: Request, res: Response) => {
-    try {
-      const { id } = req.params;
+//   delete: async (req: Request, res: Response) => {
+//     try {
+//       const { id } = req.params;
 
-      const product = await Product.findById(id);
+//       const product = await Product.findById(id);
 
-      if (!product) {
-        return handleResponse.error({
-          res: res,
-          status: 404,
-          message: 'Product not found',
-        });
-      }
+//       if (!product) {
+//         return handleResponse.error({
+//           res: res,
+//           status: 404,
+//           message: 'Product not found',
+//         });
+//       }
 
-      const deleteImages = product.images.map(async (image) => {
-        const imageRef = ref(storage, `products/images/${image.name}`);
-        await deleteObject(imageRef);
-      });
+//       const deleteImages = product.images.map(async (image) => {
+//         const imageRef = ref(storage, `products/images/${image.name}`);
+//         await deleteObject(imageRef);
+//       });
 
-      await Promise.all(deleteImages);
+//       await Promise.all(deleteImages);
 
-      await Product.findByIdAndDelete(product._id);
+//       await Product.findByIdAndDelete(product._id);
 
-      return handleResponse.success({
-        res: res,
-        status: 200,
-        message: 'Product deleted successfully',
-        data: { _id: product._id, title: product.title },
-      });
-    } catch (error: any) {
-      return handleResponse.error({
-        res: res,
-        status: 500,
-        message: error.message,
-      });
-    }
-  },
+//       return handleResponse.success({
+//         res: res,
+//         status: 200,
+//         message: 'Product deleted successfully',
+//         data: { _id: product._id, title: product.title },
+//       });
+//     } catch (error: any) {
+//       return handleResponse.error({
+//         res: res,
+//         status: 500,
+//         message: error.message,
+//       });
+//     }
+//   },
 
-  fetch: async (req: Request, res: Response) => {
-    try {
-      const { id } = req.params;
+//   fetch: async (req: Request, res: Response) => {
+//     try {
+//       const { id } = req.params;
 
-      const product = await Product.aggregate([
-        {
-          $match: {
-            _id: new mongoose.Types.ObjectId(id),
-          },
-        },
-        {
-          $lookup: {
-            from: 'users',
-            localField: 'user',
-            foreignField: '_id',
-            as: 'seller',
-          },
-        },
-      ]);
+//       const product = await Product.aggregate([
+//         {
+//           $match: {
+//             _id: new mongoose.Types.ObjectId(id),
+//           },
+//         },
+//         {
+//           $lookup: {
+//             from: 'users',
+//             localField: 'user',
+//             foreignField: '_id',
+//             as: 'seller',
+//           },
+//         },
+//       ]);
 
-      if (!product || product.length === 0) {
-        return handleResponse.error({
-          res: res,
-          status: 404,
-          message: 'Product not found',
-        });
-      }
+//       if (!product || product.length === 0) {
+//         return handleResponse.error({
+//           res: res,
+//           status: 404,
+//           message: 'Product not found',
+//         });
+//       }
 
-      const seller = product[0].seller[0];
-      const { password, verification, otp, ...sellerData } = seller;
+//       const seller = product[0].seller[0];
+//       const { password, verification, otp, ...sellerData } = seller;
 
-      const { seller: _, ...productData } = product[0];
+//       const { seller: _, ...productData } = product[0];
 
-      return handleResponse.success({
-        res: res,
-        status: 200,
-        message: 'Product fetched successfully',
-        data: { ...productData, seller: { ...sellerData } },
-      });
-    } catch (error: any) {
-      return handleResponse.error({
-        res: res,
-        status: 500,
-        message: error.message,
-      });
-    }
-  },
+//       return handleResponse.success({
+//         res: res,
+//         status: 200,
+//         message: 'Product fetched successfully',
+//         data: { ...productData, seller: { ...sellerData } },
+//       });
+//     } catch (error: any) {
+//       return handleResponse.error({
+//         res: res,
+//         status: 500,
+//         message: error.message,
+//       });
+//     }
+//   },
 
-  fetchAll: async (req: Request, res: Response) => {
-    try {
-      const query = req.query;
+//   fetchAll: async (req: Request, res: Response) => {
+//     try {
+//       const query = req.query;
 
-      const products = await Product.find(query)
-        .sort((query.sort as any) || '1')
-        .limit(parseInt(query.limit as string) || 0);
+//       const products = await Product.find(query)
+//         .sort((query.sort as any) || '1')
+//         .limit(parseInt(query.limit as string) || 0);
 
-      if (!products || products.length === 0) {
-        return handleResponse.error({
-          res: res,
-          status: 404,
-          message: 'No product was found',
-        });
-      }
+//       if (!products || products.length === 0) {
+//         return handleResponse.error({
+//           res: res,
+//           status: 404,
+//           message: 'No product was found',
+//         });
+//       }
 
-      return handleResponse.success({
-        res: res,
-        status: 200,
-        message: 'Products fetched successfully',
-        data: products,
-      });
-    } catch (error: any) {
-      return handleResponse.error({
-        res: res,
-        status: 500,
-        message: error.message,
-      });
-    }
-  },
-};
+//       return handleResponse.success({
+//         res: res,
+//         status: 200,
+//         message: 'Products fetched successfully',
+//         data: products,
+//       });
+//     } catch (error: any) {
+//       return handleResponse.error({
+//         res: res,
+//         status: 500,
+//         message: error.message,
+//       });
+//     }
+//   },
+// };

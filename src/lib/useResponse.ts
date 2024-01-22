@@ -16,9 +16,7 @@ type Other = {
  response props with a typescript type guard to determine the response type, adds an error property if ResponseType is ERROR and data property if ResponseType is SUCCESS
 */
 type ResponseProps<T extends unknown> =
-  | (ResponseType<'ERROR'> & {
-      error: T;
-    } & Other)
+  | (ResponseType<'ERROR'> & Other)
   | (ResponseType<'SUCCESS'> & {
       data: T;
     } & Other);
@@ -33,7 +31,6 @@ export const useResponse = (res: Response) => {
       return res.status(props.code).json({
         code: code,
         message: message,
-        error: props.error,
       });
     }
 

@@ -3,8 +3,9 @@ dotenv.config();
 
 export const config = {
   port: parseInt(process.env.PORT as string, 10),
-  mongoDBDriver: process.env.MONGODB_DRIVER as string,
-  secret_key: process.env.KEY as string,
+  mongoDB: process.env.MONGODB_DRIVER as string,
+  secretKey: process.env.SECRET_KEY as string,
+  client: process.env.CLIENT as string,
   gmail: {
     user: process.env.GMAIL_USER as string,
     password: process.env.GMAIL_PASSWORD as string,

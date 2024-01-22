@@ -1,29 +1,36 @@
 import mongoose, { Schema, Types } from 'mongoose';
 
-export interface NotificationTypes {
-  recipient: Types.ObjectId;
-  content: string;
-  type: 'sign-up' | 'pinned' | 'follow';
-  sender?: Types.ObjectId;
-  createdAt?: Date;
-  read?: boolean;
-}
+const SIGN_UP = 'SIGN_UP';
+const FOLLOW = 'FOLLOW';
+const OTHERS = 'OTHERS';
 
-const notificationSchema = new Schema<NotificationTypes>({
-  recipient: {
-    type: Schema.Types.ObjectId,
-    required: true,
-    default: '',
-    ref: 'user',
-  },
-  content: { type: String, required: true },
-  type: { type: String, required: true },
+type NotificationType<
+  S extends typeof SIGN_UP | typeof FOLLOW | typeof OTHERS
+> = { type: S };
+
+type Other = {
+  recipient: Types.ObjectId;
+  message: string;
+  read?: boolean;
+  createdAt?: Date;
+};
+
+export type NotificationProps =
+  | (NotificationType<'FOLLOW'> & {
+      sender: Types.ObjectId;
+    } & Other)
+  | (NotificationType<'SIGN_UP'> & Other);
+
+const notificationSchema = new Schema<NotificationProps>({
   sender: { type: Schema.Types.ObjectId },
-  createdAt: { type: Date, default: Date.now() },
-  read: { type: Boolean, required: true, default: false },
+  type: { type: String, required: true },
+  message: { type: String, required: true },
+  recipient: { type: Schema.Types.ObjectId, required: true },
+  read: { type: Boolean, default: false, required: true },
+  createdAt: { type: Date, default: Date.now(), required: true },
 });
 
-export const Notification = mongoose.model<NotificationTypes>(
+export const Notification = mongoose.model<NotificationProps>(
   'notification',
   notificationSchema
 );

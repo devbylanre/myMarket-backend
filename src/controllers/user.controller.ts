@@ -5,8 +5,8 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { config } from '../config';
-import { notification } from './notification.controller';
-import { mailer } from '../utils/nodemailer.util';
+import { createNotification } from './notification.controller';
+import { useMailer } from '../lib/useMailer';
 import path from 'path';
 
 // firebase
@@ -18,50 +18,90 @@ import {
   ref,
   uploadBytes,
 } from 'firebase/storage';
+import { useResponse } from '../lib/useResponse';
+import { usePassword } from '../lib/usePassword';
 
 const firebaseApp = initializeApp(config.firebase);
 const storage = getStorage(firebaseApp);
 
-const create = async <T extends unknown>(req: Request, res: Response) => {
-  const { email, firstName, lastName, password } = req.body;
+const createUser = async (
+  { body: { email, firstName, lastName, bio, password } }: Request,
+  res: Response
+) => {
+  const { response } = useResponse(res);
+  const { mail } = useMailer();
+  const { encrypt } = usePassword();
 
-  const emailExists = () => {
-    const check = User.findOne({ email: email });
-    return check;
-  };
-
+  // generate a verification token
   const generateVerificationToken = () => {
     return crypto.randomBytes(40).toString('hex');
   };
 
-  const hashPassword = () => {
-    const salt = bcrypt.genSaltSync(10);
-    return bcrypt.hashSync(password, salt);
-  };
-
-  const createNotification = (id: Types.ObjectId) => {
-    notification.create({
+  // create a notification doc for the process
+  const notify = async (id: Types.ObjectId) => {
+    createNotification({
+      type: 'SIGN_UP',
       recipient: id,
-      content: `Welcome aboard, ${firstName} ${lastName}! 🚀 Get started with your personalized journey`,
-      type: 'sign-up',
+      message: `Welcome aboard, ${firstName} ${lastName}! 🚀 Get started with your personalized journey`,
     });
   };
 
-  const sendMail = (token: string) => {
-    const name = firstName + ' ' + lastName;
-    const data = {
-      username: name,
+  // send a mail to the user
+  const sendAnEMail = (token: string) => {
+    mail({
+      recipient: email,
       subject: 'Welcome to myMarket',
-      verificationUrl: `https://shoponmymarket.netlify.app/verify?type=email&email=${email}&token=${token}`,
-    };
-
-    mailer.send({
-      to: email,
-      subject: 'Welcome to myMarket',
-      template: path.join(__dirname, '..', 'views', 'welcome.ejs'),
-      data: data,
+      path: path.join(__dirname, '..', 'views', 'welcome.ejs'),
+      data: {
+        username: `${firstName} ${lastName}`,
+        subject: 'Welcome to MyMarket',
+        verificationUrl: `${config.client}/verify?type=email&email=${email}&token=${token}`,
+      },
     });
   };
+
+  const createUser = async (token: string, encrypted: string) => {
+    return await User.create({
+      firstName,
+      lastName,
+      email,
+      bio,
+      password: encrypted,
+      'verification.token': token,
+    });
+  };
+
+  try {
+    const user = await User.findOne({ email: email });
+
+    // check if user already exists with the provided email address
+    if (user) {
+      return response({
+        type: 'ERROR',
+        code: 400,
+        message: 'An account already exists with the provided email address',
+      });
+    }
+
+    const token = generateVerificationToken();
+    const encryptedPassword = encrypt(password);
+
+    await createUser(token, encryptedPassword);
+    sendAnEMail(token);
+
+    return response({
+      type: 'SUCCESS',
+      code: 201,
+      message: 'Account created successfully',
+      data: { firstName, lastName, email, bio },
+    });
+  } catch (error) {
+    return response({
+      type: 'ERROR',
+      code: 500,
+      message: (error as Error).message,
+    });
+  }
 };
 
 const authenticate = (req: Request, res: Response) => {
@@ -89,7 +129,7 @@ const authenticate = (req: Request, res: Response) => {
   };
 
   const generateToken = (id: string) => {
-    const token = jwt.sign({ id: id }, config.secret_key, { expiresIn: '31d' });
+    const token = jwt.sign({ id: id }, config.secretKey, { expiresIn: '31d' });
     return token;
   };
 
@@ -106,7 +146,7 @@ const verify = (req: Request, res: Response) => {
     let id: unknown = null;
     const check = jwt.verify(
       token,
-      config.secret_key,
+      config.secretKey,
       (error: unknown, data: unknown) => {
         if (error) {
         }
@@ -325,3 +365,5 @@ const storeProduct = async (req: Request, res: Response) => {
     const query = await User.findByIdAndUpdate(id, { saved: data });
   };
 };
+
+export { createUser };
