@@ -1,14 +1,7 @@
-import { NextFunction, Request, Response } from 'express';
-import {
-  body,
-  param,
-  ValidationChain,
-  validationResult,
-} from 'express-validator';
-import { handleResponse } from '../utils/res.util';
+import { body, param } from 'express-validator';
 
 const baseValidation = [
-  body('isSeller', 'isSeller must be a boolean').optional().isBoolean(),
+  body('role', 'role must be a string').optional().notEmpty().isString(),
   body('balance', 'Balance must be a number').optional().isNumeric(),
   body('firstName', 'First name must be a string')
     .optional()
@@ -134,19 +127,4 @@ const rules = {
   verifyOTP: [...code, ...baseValidation],
 };
 
-const validate = (req: Request, res: Response, next: NextFunction) => {
-  const errors = validationResult(req);
-
-  // check if errors is not empty and return a json error
-  if (!errors.isEmpty()) {
-    return handleResponse.error({
-      res: res,
-      status: 422,
-      message: errors.array().forEach((error, i) => i === 0 && error.msg),
-    });
-  }
-
-  return next();
-};
-
-export { rules, validate };
+export { rules };

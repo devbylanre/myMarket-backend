@@ -1,6 +1,4 @@
-import { NextFunction, Request, Response } from 'express';
-import { body, check, param, validationResult } from 'express-validator';
-import { handleResponse } from '../utils/res.util';
+import { body, param } from 'express-validator';
 
 const baseValidation = [
   body('title', 'Title must be a non-empty string')
@@ -51,19 +49,4 @@ const rules = {
   fetch: validateParam,
 };
 
-const validate = (req: Request, res: Response, next: NextFunction) => {
-  const errors = validationResult(req);
-
-  // return a json error object if errors is not empty
-  if (!errors.isEmpty()) {
-    return handleResponse.error({
-      res: res,
-      status: 500,
-      message: errors.array(),
-    });
-  }
-
-  return next();
-};
-
-export { validate, rules };
+export { rules };

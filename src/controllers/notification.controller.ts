@@ -4,7 +4,7 @@ import { useResponse } from '../lib/useResponse';
 
 const createNotification = async (data: NotificationProps) => {
   const notification = new Notification(data);
-  return notification.save();
+  return await notification.save();
 };
 
 const readNotification = async (req: Request, res: Response) => {

@@ -38,8 +38,8 @@ const createUser = async (
   };
 
   // create a notification doc for the process
-  const notify = async (id: Types.ObjectId) => {
-    createNotification({
+  const signUpNotification = async (id: Types.ObjectId) => {
+    await createNotification({
       type: 'SIGN_UP',
       recipient: id,
       message: `Welcome aboard, ${firstName} ${lastName}! 🚀 Get started with your personalized journey`,
@@ -86,8 +86,9 @@ const createUser = async (
     const token = generateVerificationToken();
     const encryptedPassword = encrypt(password);
 
-    await createUser(token, encryptedPassword);
+    const newUser = await createUser(token, encryptedPassword);
     sendAnEMail(token);
+    await signUpNotification(newUser._id);
 
     return response({
       type: 'SUCCESS',
