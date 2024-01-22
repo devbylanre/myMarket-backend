@@ -3,7 +3,7 @@ import multer, { FileFilterCallback } from 'multer';
 
 export const useUpload = () => {
   const isImage = (file: Express.Multer.File, callback: FileFilterCallback) => {
-    const types = ['jpeg', 'jpg', 'png'];
+    const types = ['.jpeg', '.jpg', '.png'];
     const extension = path.extname(file.originalname).toLowerCase();
     const isTypeValid = types.includes(extension);
 
@@ -18,11 +18,7 @@ export const useUpload = () => {
     );
   };
 
-  const upload = (limits: multer.Options['limits']) => {
-    if (!limits) {
-      return null;
-    }
-
+  const configure = (limits: multer.Options['limits']) => {
     return multer({
       storage: multer.memoryStorage(),
       limits: limits,
@@ -30,5 +26,5 @@ export const useUpload = () => {
     });
   };
 
-  return { upload };
+  return { configure };
 };

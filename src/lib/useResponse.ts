@@ -24,12 +24,13 @@ type ResponseProps<T extends unknown> =
 // hook for handling route response
 export const useResponse = (res: Response) => {
   const response = <T>(props: ResponseProps<T>) => {
-    const { code, message } = props;
+    const { type, code, message } = props;
 
     // sends response json if response is not successful
     if (props.type === 'ERROR') {
       return res.status(props.code).json({
         code: code,
+        status: type.toLowerCase(),
         message: message,
       });
     }
@@ -38,6 +39,7 @@ export const useResponse = (res: Response) => {
     if (props.type === 'SUCCESS') {
       return res.status(props.code).json({
         code: code,
+        status: type.toLowerCase(),
         message: message,
         data: props.data,
       });

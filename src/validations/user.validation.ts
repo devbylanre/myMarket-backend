@@ -1,6 +1,6 @@
 import { body, param } from 'express-validator';
 
-const baseValidation = [
+const base = [
   body('role', 'Role must be a string').optional().notEmpty().isString(),
   body('balance', 'Balance must be a number').optional().isNumeric(),
   body('firstName', 'First name must be a string')
@@ -90,41 +90,26 @@ const baseValidation = [
     .optional()
     .isString()
     .notEmpty(),
-];
-
-const newEmail = [
-  body('newEmail', 'New email address must be a valid email address')
+  body('verification', 'Verification must be contain token key')
     .optional()
-    .isEmail(),
-];
-
-const code = [
-  body('code', 'OTP code must be a string').optional().isString().notEmpty(),
-];
-
-const token = [
-  body('token', 'Verification token must be a string')
+    .isObject(),
+  body('verification.token', 'Verification token must be a non-empty string')
     .optional()
-    .isString()
-    .notEmpty(),
+    .notEmpty()
+    .isString(),
+  body('photo', 'Photo must be contain token key').optional().isObject(),
 ];
 
-const validateObjectId = (paramName: string) => {
-  return [param(paramName, 'Invalid user object id').isMongoId()];
+const paramId = (name: string) => {
+  return [param(name, 'Invalid user object id').isMongoId()];
 };
 
 const rules = {
-  create: baseValidation,
-  authentication: baseValidation,
-  verify: baseValidation,
-  fetch: validateObjectId('id'),
-  fetchProducts: validateObjectId('id'),
-  update: [...validateObjectId('id'), ...baseValidation],
-  photoUpload: baseValidation,
-  verifyEmail: [...token, ...baseValidation],
-  changeEmail: [...newEmail, ...baseValidation],
-  generateOTP: baseValidation,
-  verifyOTP: [...code, ...baseValidation],
+  create: base,
+  authenticate: base,
+  get: paramId('id'),
+  update: [...base, ...paramId('id')],
+  verifyEmail: base,
 };
 
 export { rules };
