@@ -28,9 +28,9 @@ const createUser = async (
   { body: { email, firstName, lastName, bio, password } }: Request,
   res: Response
 ) => {
-  const { response } = useResponse(res);
   const { mail } = useMailer();
   const { encrypt } = usePassword();
+  const { response } = useResponse(res);
 
   // generate a verification token
   const generateVerificationToken = () => {
@@ -48,7 +48,7 @@ const createUser = async (
 
   // send a mail to the user
   const sendAnEMail = (token: string) => {
-    mail({
+    return mail({
       recipient: email,
       subject: 'Welcome to myMarket',
       path: path.join(__dirname, '..', 'views', 'welcome.ejs'),
@@ -87,14 +87,14 @@ const createUser = async (
     const encryptedPassword = encrypt(password);
 
     const newUser = await createUser(token, encryptedPassword);
-    sendAnEMail(token);
-    await signUpNotification(newUser._id);
+    const notification = await signUpNotification(newUser._id);
+    const mail = sendAnEMail(token);
 
     return response({
       type: 'SUCCESS',
       code: 201,
       message: 'Account created successfully',
-      data: { firstName, lastName, email, bio },
+      data: { firstName, lastName, email, bio, notification, mail },
     });
   } catch (error) {
     return response({

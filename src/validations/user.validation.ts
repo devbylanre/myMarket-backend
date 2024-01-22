@@ -1,7 +1,7 @@
 import { body, param } from 'express-validator';
 
 const baseValidation = [
-  body('role', 'role must be a string').optional().notEmpty().isString(),
+  body('role', 'Role must be a string').optional().notEmpty().isString(),
   body('balance', 'Balance must be a number').optional().isNumeric(),
   body('firstName', 'First name must be a string')
     .optional()
