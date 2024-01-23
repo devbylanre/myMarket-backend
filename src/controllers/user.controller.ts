@@ -1,15 +1,11 @@
-import mongoose, { ObjectId, Types } from 'mongoose';
+import { Types } from 'mongoose';
 import { User } from '../models/user.model';
-import { Request, Response, response } from 'express';
-import bcrypt from 'bcrypt';
-import jwt from 'jsonwebtoken';
+import { Request, Response } from 'express';
 import crypto from 'crypto';
 import config from '../config';
 import { createNotification } from './notification.controller';
 import { useMailer } from '../lib/useMailer';
 import path from 'path';
-
-// firebase
 import { initializeApp } from 'firebase/app';
 import {
   deleteObject,
@@ -26,576 +22,456 @@ import { Product } from '../models/product.model';
 const firebaseApp = initializeApp(config.firebase);
 const storage = getStorage(firebaseApp);
 
-const createUser = async (
-  { body: { email, firstName, lastName, bio, password } }: Request,
-  res: Response
-) => {
-  const { mail } = useMailer();
-  const { encrypt } = usePassword();
-  const { response } = useResponse(res);
+export const controller = {
+  create: async ({ body }: Request, res: Response) => {
+    const { mail } = useMailer();
+    const { encrypt } = usePassword();
+    const { response } = useResponse(res);
 
-  const getUser = async () => {
-    const user = await User.findOne({ email: email });
-    if (!user) throw new Error('User not found');
-    return user;
-  };
+    try {
+      const { firstName, lastName, email, password } = body;
+      const name = `${firstName} ${lastName}`;
+      const token = crypto.randomBytes(40).toString('hex');
+      const encryptedPassword = encrypt(password);
 
-  // generate a verification token
-  const generateVerificationToken = () => {
-    return crypto.randomBytes(40).toString('hex');
-  };
+      // find user with email
+      const existingUser = await User.findOne({ email: body.email });
 
-  // create a notification doc for the process
-  const signUpNotification = async (id: Types.ObjectId) => {
-    return await createNotification({
-      type: 'SIGN_UP',
-      recipient: id,
-      message: `Welcome aboard, ${firstName} ${lastName}! 🚀 Get started with your personalized journey`,
-    });
-  };
+      if (existingUser) {
+        throw new Error('Email is already registered to another user');
+      }
 
-  // send a mail to the user
-  const sendEmail = async (token: string) => {
-    return await mail({
-      recipient: email,
-      subject: 'Welcome to myMarket',
-      path: path.join(__dirname, '..', 'views', 'welcome.ejs'),
-      data: {
-        username: `${firstName} ${lastName}`,
-        subject: 'Welcome to MyMarket',
-        verificationUrl: `${config.client}/verify?type=email&email=${email}&token=${token}`,
-      },
-    });
-  };
+      // register user
+      const registeredUser = await User.create({
+        ...body,
+        password: encryptedPassword,
+        'verification.token': token,
+      });
 
-  const createUser = async (token: string, encrypted: string) => {
-    return await User.create({
-      firstName,
-      lastName,
-      email,
-      bio,
-      password: encrypted,
-      'verification.token': token,
-    });
-  };
+      // notify user about successful registration
+      const notification = await createNotification({
+        type: 'SIGN_UP',
+        recipient: registeredUser._id,
+        message: `Welcome aboard, ${name}! 🚀 Let's get you started with your personalized journey on MyMarket`,
+      });
 
-  try {
-    const user = await getUser();
+      // send an e-mail to the user about successful registration
+      const eMail = await mail({
+        recipient: email,
+        subject: 'Welcome to myMarket',
+        file: 'welcome.ejs',
+        data: {
+          name: name,
+          subject: 'Welcome to MyMarket',
+          url: `${config.client}/verify?type=email&email=${body.email}&token=${token}`,
+        },
+      });
 
-    const token = generateVerificationToken();
-    const encryptedPassword = encrypt(password);
-
-    const newUser = await createUser(token, encryptedPassword);
-    const notification = await signUpNotification(newUser._id);
-    const mail = await sendEmail(token);
-
-    return response({
-      type: 'SUCCESS',
-      code: 201,
-      message: 'Account created successfully',
-      data: { firstName, lastName, email, bio, notification, mail },
-    });
-  } catch (error) {
-    return response({
-      type: 'ERROR',
-      code: 500,
-      message: (error as Error).message,
-    });
-  }
-};
-
-const authenticateUser = async ({ body }: Request, res: Response) => {
-  const { isMatch } = usePassword();
-  const { sign, expire } = useToken();
-  const { response } = useResponse(res);
-
-  const getUser = async () => {
-    const user = await User.findOne({ email: body.email });
-    if (!user) throw new Error('User not found');
-    return user;
-  };
-
-  const isPasswordMatch = (encrypted: string) => {
-    const result = isMatch(body.password, encrypted);
-
-    if (!result) throw new Error('Password does not match');
-  };
-
-  try {
-    const user = await getUser();
-    isPasswordMatch(user.password);
-
-    const token = sign({ id: user._id }, '24d');
-    const expiresAt = expire(token);
-
-    const { otp, verification, password, ...data } = user.toObject();
-
-    return response({
-      type: 'SUCCESS',
-      code: 200,
-      message: 'User authentication successful',
-      data: { data, session: { token, expiresAt } },
-    });
-  } catch (error) {
-    return response({
-      type: 'ERROR',
-      code: 500,
-      message: (error as Error).message,
-    });
-  }
-};
-
-const getUser = async ({ params: { id } }: Request, res: Response) => {
-  const { response } = useResponse(res);
-
-  const getUser = async () => {
-    const user = await User.findById(id);
-    if (!user) throw new Error('User not found');
-    return user;
-  };
-
-  try {
-    const user = await getUser();
-    const { otp, verification, password, ...data } = user.toObject();
-
-    return response({
-      type: 'SUCCESS',
-      code: 200,
-      message: 'User verification successful',
-      data: { ...data },
-    });
-  } catch (error) {
-    return response({
-      type: 'ERROR',
-      code: 500,
-      message: (error as Error).message,
-    });
-  }
-};
-
-const updateUser = async (
-  {
-    params: { id },
-    body: { otp, verification, password, email, ...payload },
-  }: Request,
-  res: Response
-) => {
-  const { response } = useResponse(res);
-
-  const getUser = async () => {
-    const user = await User.findById(id);
-    if (!user) throw new Error('User not found');
-  };
-
-  const storeAlreadyExists = async () => {
-    const name = await User.findOne({ 'store.name': payload?.store?.name });
-
-    if (name) throw new Error('Store name is taken, try using another name');
-  };
-
-  try {
-    await getUser();
-    await storeAlreadyExists();
-
-    // update user
-    await User.findByIdAndUpdate(id, payload);
-
-    return response({
-      type: 'SUCCESS',
-      code: 200,
-      message: 'User updated successfully',
-      data: payload,
-    });
-  } catch (error) {
-    return response({
-      type: 'ERROR',
-      code: 500,
-      message: (error as Error).message,
-    });
-  }
-};
-
-const verifyUserEmail = async (
-  { body: { email, verification } }: Request,
-  res: Response
-) => {
-  const { response } = useResponse(res);
-
-  const getUser = async () => {
-    const user = await User.findOne({ email: email });
-    // check if user does not exist
-    if (!user) throw new Error('User not found');
-
-    return user;
-  };
-
-  const isUserVerified = (isVerified: boolean) => {
-    if (isVerified) throw new Error('User is already verified');
-  };
-
-  const isTokenValid = (token?: string) => {
-    if (!token) throw new Error('User verification token is required');
-    const check = token === verification.token;
-
-    // check if user verification token is valid
-    if (!check) {
-      throw new Error('Invalid user verification token');
+      return response({
+        type: 'SUCCESS',
+        code: 201,
+        message: 'Account created successfully',
+        data: { email, notification, eMail },
+      });
+    } catch (error) {
+      return response({
+        type: 'ERROR',
+        code: 500,
+        message: (error as Error).message,
+      });
     }
-  };
+  },
 
-  try {
-    const user = await getUser();
+  authenticate: async ({ body }: Request, res: Response) => {
+    const { isMatch } = usePassword();
+    const { sign, expire } = useToken();
+    const { response } = useResponse(res);
 
-    if (user.verification) {
-      isUserVerified(user.verification.isVerified);
-      isTokenValid(user.verification.token);
+    try {
+      const user = await User.findOne({ email: body.email });
+      if (!user) throw new Error('We could not find your account');
+
+      const passwordMatch = isMatch(body.password, user.password);
+      if (!passwordMatch) throw new Error('Invalid password, try again');
+
+      const token = sign({ id: user._id }, '24d');
+      const expiresAt = expire(token);
+
+      const { otp, verification, password, ...data } = user.toObject();
+
+      return response({
+        type: 'SUCCESS',
+        code: 200,
+        message: 'User authentication successful',
+        data: { data, session: { token, expiresAt } },
+      });
+    } catch (error) {
+      return response({
+        type: 'ERROR',
+        code: 500,
+        message: (error as Error).message,
+      });
     }
+  },
 
-    const updatedUser = await User.findOneAndUpdate(
-      { _id: user._id },
-      { verification: { token: '', isVerified: true } },
-      { new: true }
-    );
+  get: async ({ params: { id } }: Request, res: Response) => {
+    const { response } = useResponse(res);
+    try {
+      const user = await User.findById(id);
+      if (!user) throw new Error('User account not found');
 
-    return response({
-      type: 'SUCCESS',
-      code: 200,
-      message: 'User email verification successfully',
-      data: { email: updatedUser?.email },
-    });
-  } catch (error) {
-    return response({
-      type: 'ERROR',
-      code: 500,
-      message: (error as Error).message,
-    });
-  }
-};
+      const { otp, verification, password, ...data } = user.toObject();
 
-const uploadPhoto = async (
-  { file, params: { id } }: Request,
-  res: Response
-) => {
-  const { response } = useResponse(res);
-
-  // check if no file was uploaded
-  if (!file) throw new Error('No file was provided');
-
-  const getUser = async () => {
-    const user = await User.findById(id);
-    if (!user) throw new Error('User not found');
-    return user;
-  };
-
-  // creates a unique file name
-  const createUniqueName = () => {
-    const data = `${id}-${Date.now()}${path.extname(file.originalname)}`;
-    return data;
-  };
-
-  // deletes an existing photo file
-  const deletePhoto = async (name?: string) => {
-    if (name) {
-      const photo = ref(storage, `/photos/${name}`);
-      await deleteObject(photo);
+      return response({
+        type: 'SUCCESS',
+        code: 200,
+        message: 'User verification successful',
+        data: { ...data },
+      });
+    } catch (error) {
+      return response({
+        type: 'ERROR',
+        code: 500,
+        message: (error as Error).message,
+      });
     }
-  };
+  },
 
-  // uploads a photo
-  const uploadPhoto = async (encrypt: string) => {
-    const photo = ref(storage, `photos/${encrypt}`);
-    const snapshot = await uploadBytes(photo, file.buffer);
-    const url = getDownloadURL(snapshot.ref);
-    return url;
-  };
+  update: async ({ params: { id }, body }: Request, res: Response) => {
+    const { response } = useResponse(res);
 
-  try {
-    const user = await getUser();
-    const name = createUniqueName();
-    await deletePhoto(user.photo?.name);
-    const url = await uploadPhoto(name);
+    try {
+      const { otp, verification, password, email, ...payload } = body;
 
-    const updatedUser = await User.findByIdAndUpdate(
-      id,
-      { photo: { name, url } },
-      { new: true }
-    );
+      const user = await User.findById(id);
+      if (!user) throw new Error('User account not found');
 
-    return response({
-      type: 'SUCCESS',
-      code: 200,
-      message: 'User updated successfully',
-      data: updatedUser?.photo,
-    });
-  } catch (error) {
-    return response({
-      type: 'ERROR',
-      code: 500,
-      message: (error as Error).message,
-    });
-  }
-};
+      const storeAlreadyExists = payload?.store?.name === user?.store?.name;
 
-const getProducts = async ({ params: { id } }: Request, res: Response) => {
-  const { response } = useResponse(res);
+      if (storeAlreadyExists)
+        throw new Error('Store name has already been taken ');
 
-  const getUser = async () => {
-    const user = await User.findById(id);
-    if (!user) throw new Error('User not found');
-    return user;
-  };
+      const updatedUser = await User.findByIdAndUpdate(id, { ...payload });
 
-  const getProducts = async () => {
-    const products = await Product.find({ user: id });
-    if (!products || products.length === 0)
-      throw new Error('Product not found');
-    return products;
-  };
-
-  try {
-    await getUser();
-    const products = await getProducts();
-
-    return response({
-      type: 'SUCCESS',
-      code: 200,
-      message: 'Products found successfully',
-      data: products,
-    });
-  } catch (error) {
-    return response({
-      type: 'ERROR',
-      code: 500,
-      message: (error as Error).message,
-    });
-  }
-};
-
-const changeEmail = async ({ body: { email, id } }: Request, res: Response) => {
-  const { response } = useResponse(res);
-
-  const getUser = async () => {
-    const user = await User.findById(id);
-    if (!user) throw new Error('User not found');
-    return user;
-  };
-
-  try {
-    const user = await getUser();
-  } catch (error) {
-    return response({
-      type: 'ERROR',
-      code: 500,
-      message: (error as Error).message,
-    });
-  }
-};
-
-const changePassword = async (
-  { body: { email, oldPassword, newPassword } }: Request,
-  res: Response
-) => {
-  const { response } = useResponse(res);
-  const { isMatch, encrypt } = usePassword();
-
-  // get user data
-  const getUser = async () => {
-    const user = await User.findOne({ email: email });
-    if (!user) throw new Error('User not found');
-    return user;
-  };
-  // check if the user password is correct
-  const isPasswordMatch = (encrypted: string) => {
-    const check = isMatch(oldPassword, encrypted);
-    if (!check) throw new Error('Password does not match');
-  };
-
-  // encrypt the new user password
-  const encryptNewPassword = () => {
-    const encrypted = encrypt(newPassword);
-    return encrypted;
-  };
-
-  try {
-    const user = await getUser();
-    isPasswordMatch(user.password);
-    const password = encryptNewPassword();
-
-    await User.findOneAndUpdate({ email: email }, { password: password });
-
-    return response({
-      type: 'SUCCESS',
-      code: 200,
-      message: 'User password updated successfully',
-      data: email,
-    });
-  } catch (error) {
-    return response({
-      type: 'ERROR',
-      code: 500,
-      message: (error as Error).message,
-    });
-  }
-};
-
-const oneTimePassword = async ({ params: { id } }: Request, res: Response) => {
-  const { response } = useResponse(res);
-  const TIME_TO_ADD = 15 * 1000;
-
-  const getUser = async () => {
-    const user = await User.findById(id);
-    if (!user) throw new Error('User not found');
-    return user;
-  };
-
-  const createToken = () => {
-    let token = '';
-    for (let i = 0; i < 6; i++) {
-      const randomNumber = Math.floor(Math.random() * 10);
-      token += randomNumber;
+      return response({
+        type: 'SUCCESS',
+        code: 200,
+        message: 'User updated successfully',
+        data: payload,
+      });
+    } catch (error) {
+      return response({
+        type: 'ERROR',
+        code: 500,
+        message: (error as Error).message,
+      });
     }
-    return token;
-  };
+  },
 
-  const getTime = () => {
-    const time = new Date().getTime();
-    return time + TIME_TO_ADD;
-  };
+  emailVerification: async ({ body }: Request, res: Response) => {
+    const { response } = useResponse(res);
 
-  try {
-    const user = await getUser();
-    const token = createToken();
-    const expiresAt = getTime();
+    try {
+      const { email, verification } = body;
+      const user = await User.findOne({ email: email });
+      if (!user) throw new Error('User account not found');
 
-    const updatedUser = await User.findByIdAndUpdate(
-      id,
-      { otp: { code: token, expiresAt } },
-      { new: true }
-    );
+      const isUserVerified = user.verification?.isVerified;
+      if (isUserVerified) throw new Error('This email is already verified');
 
-    return response({
-      type: 'SUCCESS',
-      code: 200,
-      message: 'One time password generated successfully',
-      data: updatedUser?.otp,
-    });
-  } catch (error) {
-    return response({
-      type: 'ERROR',
-      code: 500,
-      message: (error as Error).message,
-    });
-  }
-};
+      const isTokenValid = verification.token === user.verification?.token;
+      if (!isTokenValid) throw new Error('Verification token is not valid');
 
-const verifyOneTimePassword = async (
-  { body: { otp }, params: { id } }: Request,
-  res: Response
-) => {
-  const { response } = useResponse(res);
+      const verifyUser = await User.findOneAndUpdate(
+        { email: email },
+        { 'verification.token': '', 'verification.isVerified': true }
+      );
 
-  // get user doc from database
-  const getUser = async () => {
-    const user = await User.findById(id);
-    if (!user) throw new Error('User not found');
-    return user;
-  };
+      return response({
+        type: 'SUCCESS',
+        code: 200,
+        message: 'User email verification successfully',
+        data: 'Email verification completed successfully',
+      });
+    } catch (error) {
+      return response({
+        type: 'ERROR',
+        code: 500,
+        message: (error as Error).message,
+      });
+    }
+  },
 
-  // check if otp has expired
-  const hasExpired = (expiresAt: number) => {
-    const currentTime = Date.now();
-    const check = currentTime > expiresAt;
+  uploadPhoto: async ({ file, params: { id } }: Request, res: Response) => {
+    const { response } = useResponse(res);
 
-    if (check) throw new Error('One Time Password has expired');
-  };
+    try {
+      // check if no file was uploaded
+      if (!file) throw new Error('No file was provided');
 
-  // check if otp token is valid
-  const verify = (code: string) => {
-    const check = otp.code === code;
-    if (!check) throw new Error('One Time Password verification failed');
-  };
+      // find user account
+      const user = await User.findById(id);
+      if (!user) throw new Error('User account not found');
 
-  try {
-    const user = await getUser();
-    verify(user!.otp!.code);
-    hasExpired(user.otp?.expiresAt!); // fix null error
+      // get file extension
+      const fileExtension = path.extname(file.originalname);
+      // create unique file name
+      const fileName = `${Date.now()}-${user._id}${fileExtension}`;
 
-    const updatedOtp = await User.findByIdAndUpdate(
-      id,
-      { otp: { code: '', expiresAt: 0 } },
-      { new: true }
-    );
+      // check if file exists
+      if (user.photo?.name) {
+        const photo = ref(storage, `photos/${user.photo?.name}`);
+        await deleteObject(photo);
+      }
 
-    return response({
-      type: 'SUCCESS',
-      code: 500,
-      message: 'One Time Password verification successful',
-      data: updatedOtp?.otp,
-    });
-  } catch (error) {
-    return response({
-      type: 'ERROR',
-      code: 500,
-      message: (error as Error).message,
-    });
-  }
-};
+      const photo = ref(storage, `photos/${fileName}`);
+      // upload file
+      const uploadedPhoto = await uploadBytes(photo, file.buffer);
+      // get uploaded file url
+      const uploadedFileURI = getDownloadURL(uploadedPhoto.ref);
 
-const followUser = async (req: Request, res: Response) => {
-  const { token, id } = req.body;
+      // store file data
+      const savedPhoto = await User.findByIdAndUpdate(
+        id,
+        { 'photo.name': fileName, 'photo.url': uploadedFileURI },
+        { new: true }
+      );
 
-  const getUser = async () => {};
+      return response({
+        type: 'SUCCESS',
+        code: 200,
+        message: 'User updated successfully',
+        data: savedPhoto?.photo,
+      });
+    } catch (error) {
+      return response({
+        type: 'ERROR',
+        code: 500,
+        message: (error as Error).message,
+      });
+    }
+  },
 
-  const isAlreadyFollowed = (id: string, followers: string[]) => {
-    const check = followers.includes(id);
-    return check;
-  };
+  changeEmail: async ({ body }: Request, res: Response) => {
+    const { response } = useResponse(res);
+    const { isMatch } = usePassword();
+    const { oldEmail, newEmail, password } = body;
 
-  const follow = (id: string, followers: string[]) => {
-    const newFollowers = [...followers, id];
-    return newFollowers;
-  };
+    try {
+      const user = await User.findOne({ email: oldEmail });
+      if (!user) throw new Error('User account not registered');
 
-  const unFollow = (id: string, followers: string[]) => {
-    const filter = followers.filter((user) => user !== id);
-    return filter;
-  };
+      const isPasswordValid = isMatch(password, user.password);
+      if (!isPasswordValid) throw new Error('Incorrect password, try again');
 
-  const update = async (id: string, data: string[]) => {
-    const query = await User.findByIdAndUpdate(id, { followers: data });
-  };
-};
+      const updatedUser = await User.findOneAndUpdate(
+        { email: oldEmail },
+        { email: newEmail },
+        { new: true }
+      );
 
-const storeProduct = async (req: Request, res: Response) => {
-  const {} = req.body;
+      return response({
+        type: 'SUCCESS',
+        code: 200,
+        message: 'Email updated successfully',
+        data: updatedUser?.email,
+      });
+    } catch (error) {
+      return response({
+        type: 'ERROR',
+        code: 500,
+        message: (error as Error).message,
+      });
+    }
+  },
 
-  const getUser = async () => {};
+  changePassword: async ({ body }: Request, res: Response) => {
+    const { response } = useResponse(res);
+    const { isMatch, encrypt } = usePassword();
 
-  const productExists = (id: string, products: string[]) => {
-    const check = products.includes(id);
-    return check;
-  };
+    try {
+      const { email, oldPassword, newPassword } = body;
 
-  const addProducts = (id: string, products: string[]) => {
-    const newProducts = [...products, id];
-    return newProducts;
-  };
+      const user = await User.findOne({ email: email });
+      if (!user) throw new Error(`User account not found`);
 
-  const removeProducts = (id: string, products: string[]) => {
-    const filter = products.filter((product) => product !== id);
-    return filter;
-  };
+      const isPasswordValid = isMatch(oldPassword, user.password);
+      if (!isPasswordValid) throw new Error('Incorrect password, try again');
 
-  const update = async (id: string, data: string[]) => {
-    const query = await User.findByIdAndUpdate(id, { saved: data });
-  };
-};
+      const encryptedPassword = encrypt(newPassword);
 
-export {
-  createUser,
-  authenticateUser,
-  getUser,
-  updateUser,
-  verifyUserEmail,
-  uploadPhoto,
+      const updatedUser = await User.findByIdAndUpdate(
+        { email: email },
+        { password: encryptedPassword }
+      );
+
+      return response({
+        type: 'SUCCESS',
+        code: 200,
+        message: 'Password updated successfully',
+        data: email,
+      });
+    } catch (error) {
+      return response({
+        type: 'ERROR',
+        code: 500,
+        message: (error as Error).message,
+      });
+    }
+  },
+
+  generateOneTimePassword: async ({ params }: Request, res: Response) => {
+    const { response } = useResponse(res);
+    const TIME_TO_ADD = 15 * 1000;
+
+    try {
+      const { id } = params;
+
+      const user = await User.findById(id);
+      if (!user) throw new Error('User account not found');
+
+      const code = Math.floor(Math.random() * 100000);
+      const expiresAt = Date.now() + TIME_TO_ADD;
+
+      const storeOtp = await User.findByIdAndUpdate(
+        id,
+        {
+          'otp.code': code,
+          'otp.expiresAt': expiresAt,
+        },
+        { new: true }
+      );
+
+      return response({
+        type: 'SUCCESS',
+        code: 200,
+        message: 'One Time Password generated successfully',
+        data: storeOtp?.otp,
+      });
+    } catch (error) {
+      return response({
+        type: 'ERROR',
+        code: 500,
+        message: (error as Error).message,
+      });
+    }
+  },
+
+  verifyOneTimePassword: async ({ body }: Request, res: Response) => {
+    const { response } = useResponse(res);
+
+    try {
+      const { id, otp } = body;
+
+      const user = await User.findById(id);
+      if (!user) throw new Error('User account not found');
+
+      const hasCodeExpired = Date.now() > user.otp.expiresAt;
+      if (hasCodeExpired) throw new Error('One Time Password has expired');
+
+      const isCodeOk = user.otp.code === otp.code;
+      if (!isCodeOk) throw new Error('Invalid One Time Password');
+
+      const unsetOtp = await User.findByIdAndUpdate(
+        id,
+        { 'otp.code': '', 'otp.expiresAt': 0 },
+        { new: true }
+      );
+
+      return response({
+        type: 'SUCCESS',
+        code: 200,
+        message: 'One Time Password verification successfully',
+        data: unsetOtp?.otp,
+      });
+    } catch (error) {
+      return response({
+        type: 'ERROR',
+        code: 500,
+        message: (error as Error).message,
+      });
+    }
+  },
+
+  follow: async ({ body }: Request, res: Response) => {
+    const { response } = useResponse(res);
+
+    try {
+      const { userId, followerId } = body;
+
+      const userToFollow = await User.findById(userId);
+      const follower = await User.findById(followerId);
+
+      if (!userToFollow || !follower) throw new Error('User account not found');
+
+      const alreadyFollowed = userToFollow.followers.includes(followerId);
+      const followUser = [...userToFollow.followers, followerId];
+      const unFollowUser = userToFollow.followers.filter(
+        (id) => id !== followerId
+      );
+
+      const data = alreadyFollowed ? unFollowUser : followUser;
+
+      const storedFollowers = await User.findByIdAndUpdate(
+        userId,
+        { followers: data },
+        { new: true }
+      );
+
+      const unFollowMessage = 'You have un-followed this account';
+      const followMessage = 'User followed successfully';
+
+      return response({
+        type: 'SUCCESS',
+        code: 200,
+        message: alreadyFollowed ? unFollowMessage : followMessage,
+        data: storedFollowers?.followers,
+      });
+    } catch (error) {
+      return response({
+        type: 'ERROR',
+        code: 500,
+        message: (error as Error).message,
+      });
+    }
+  },
+
+  saveProduct: async ({ body }: Request, res: Response) => {
+    const { response } = useResponse(res);
+
+    try {
+      const { userId, productId } = body;
+
+      const user = await User.findById(userId);
+      if (!user) throw new Error('User not found');
+
+      const isProductSaved = user.saved.includes(productId);
+      const saveProduct = [...user.saved, productId];
+      const removeProduct = user.saved.filter((id) => id !== productId);
+
+      const data = isProductSaved ? saveProduct : removeProduct;
+
+      const updatedUser = await User.findByIdAndUpdate(
+        userId,
+        { saved: data },
+        { new: true }
+      );
+
+      const saveMessage = 'Product saved successfully';
+      const removeMessage = 'Product removed successfully';
+
+      return response({
+        type: 'SUCCESS',
+        code: 200,
+        message: isProductSaved ? removeMessage : saveMessage,
+        data: updatedUser?.saved,
+      });
+    } catch (error) {
+      return response({
+        type: 'ERROR',
+        code: 500,
+        message: (error as Error).message,
+      });
+    }
+  },
 };

@@ -1,14 +1,16 @@
 import nodemailer from 'nodemailer';
 import config from '../config';
 import ejs, { Data } from 'ejs';
+import path from 'path';
 
-export type Mailer<T extends unknown> = {
+export type MailOptions<T extends unknown> = {
   recipient: string;
   subject: string;
-  path: string;
+  file: string;
   data: T;
 };
 
+// create a nodemailer transporter
 const transporter = nodemailer.createTransport({
   host: 'smtp.gmail.com',
   service: 'gmail',
@@ -19,12 +21,15 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+// hook for sending email
 export const useMailer = () => {
-  const mail = async <T extends unknown>(options: Mailer<T>) => {
-    const { recipient, subject, path, data } = options;
+  const mail = async <T extends unknown>(options: MailOptions<T>) => {
+    const { recipient, subject, file, data } = options;
+    const filePath = path.join(__dirname, '..', 'views', file);
 
-    const template = await ejs.renderFile(path, data as Data);
+    const template = await ejs.renderFile(filePath, data as Data);
 
+    // construct the mail object
     const mailOptions: nodemailer.SendMailOptions = {
       from: 'noreply@gmymarket.com',
       to: recipient,

@@ -1,8 +1,72 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
-const userSchema = new Schema(
+type Verification = {
+  token: string;
+  isVerified: boolean;
+};
+
+type Mobile = {
+  country: string;
+  code: number;
+  number: number;
+};
+
+type Billing = {
+  country: string;
+  state: string;
+  city: string;
+  address: string;
+};
+
+type Location = {
+  country: string;
+  state: string;
+  city: string;
+  address: string;
+};
+
+type Store = {
+  name: string;
+  description: string;
+  location: Location;
+};
+
+type Otp = {
+  code: string;
+  expiresAt: number;
+};
+
+type Account = {
+  platform: string;
+  url: string;
+};
+
+type Photo = {
+  name: string;
+  url: string;
+};
+
+export type UserDoc = Document & {
+  role: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  password: string;
+  bio: string;
+  verification: Verification;
+  mobile: Mobile;
+  billing: Billing;
+  followers: Schema.Types.ObjectId[];
+  saved: Schema.Types.ObjectId[];
+  store: Store;
+  otp: Otp;
+  accounts: Account[];
+  photo: Photo;
+};
+
+const userSchema = new Schema<UserDoc>(
   {
-    role: { type: String, default: 'buyer' },
+    role: { type: String, default: 'buyer', required: true },
     firstName: { type: String, required: true },
     lastName: { type: String, required: true },
     email: { type: String, required: true, unique: true },
@@ -23,10 +87,11 @@ const userSchema = new Schema(
       city: { type: String, default: '' },
       address: { type: String, default: '' },
     },
+    followers: [{ type: Schema.Types.ObjectId, ref: 'Users' }],
+    saved: [{ type: Schema.Types.Boolean, ref: 'Products' }],
     store: {
       name: { type: String, default: '' },
       description: { type: String, default: '' },
-      followers: [{ type: Schema.Types.ObjectId }],
       location: {
         country: { type: String, default: '' },
         state: { type: String, default: '' },
@@ -52,4 +117,4 @@ const userSchema = new Schema(
   { timestamps: true }
 );
 
-export const User = mongoose.model('user', userSchema);
+export const User = mongoose.model<UserDoc>('Users', userSchema);
