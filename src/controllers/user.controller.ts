@@ -18,6 +18,7 @@ import { useResponse } from '../lib/useResponse';
 import { usePassword } from '../lib/usePassword';
 import { useToken } from '../lib/useToken';
 import { Product } from '../models/product.model';
+import { useArray } from '../lib/useArray';
 
 const firebaseApp = initializeApp(config.firebase);
 const storage = getStorage(firebaseApp);
@@ -37,9 +38,8 @@ export const controller = {
       // find user with email
       const existingUser = await User.findOne({ email: body.email });
 
-      if (existingUser) {
+      if (existingUser)
         throw new Error('Email is already registered to another user');
-      }
 
       // register user
       const registeredUser = await User.create({
@@ -88,14 +88,16 @@ export const controller = {
     const { response } = useResponse(res);
 
     try {
+      // find user by email
       const user = await User.findOne({ email: body.email });
       if (!user) throw new Error('We could not find your account');
 
+      // confirm if password is correct
       const passwordMatch = isMatch(body.password, user.password);
       if (!passwordMatch) throw new Error('Invalid password, try again');
 
-      const token = sign({ id: user._id }, '24d');
-      const expiresAt = expire(token);
+      const token = sign({ id: user._id }, '24d'); // create json web token
+      const expiresAt = expire(token); // get token expiration time
 
       const { otp, verification, password, ...data } = user.toObject();
 
@@ -117,6 +119,7 @@ export const controller = {
   get: async ({ params: { id } }: Request, res: Response) => {
     const { response } = useResponse(res);
     try {
+      // find user by id
       const user = await User.findById(id);
       if (!user) throw new Error('User account not found');
 
@@ -143,14 +146,17 @@ export const controller = {
     try {
       const { otp, verification, password, email, ...payload } = body;
 
+      // find user by id
       const user = await User.findById(id);
       if (!user) throw new Error('User account not found');
 
+      // check if store name exists
       const storeAlreadyExists = payload?.store?.name === user?.store?.name;
 
       if (storeAlreadyExists)
         throw new Error('Store name has already been taken ');
 
+      // update user data
       const updatedUser = await User.findByIdAndUpdate(id, { ...payload });
 
       return response({
@@ -173,15 +179,21 @@ export const controller = {
 
     try {
       const { email, verification } = body;
+
+      // find user by email
       const user = await User.findOne({ email: email });
       if (!user) throw new Error('User account not found');
 
       const isUserVerified = user.verification?.isVerified;
+
+      // check if user is verified
       if (isUserVerified) throw new Error('This email is already verified');
 
+      // check if token is valid
       const isTokenValid = verification.token === user.verification?.token;
       if (!isTokenValid) throw new Error('Verification token is not valid');
 
+      // unset verification data
       const verifyUser = await User.findOneAndUpdate(
         { email: email },
         { 'verification.token': '', 'verification.isVerified': true }
@@ -202,32 +214,28 @@ export const controller = {
     }
   },
 
-  uploadPhoto: async ({ file, params: { id } }: Request, res: Response) => {
+  uploadPhoto: async ({ file, body: { id } }: Request, res: Response) => {
     const { response } = useResponse(res);
 
     try {
-      // check if no file was uploaded
+      // throe error if no file was uploaded
       if (!file) throw new Error('No file was provided');
 
       // find user account
       const user = await User.findById(id);
       if (!user) throw new Error('User account not found');
 
-      // get file extension
       const fileExtension = path.extname(file.originalname);
-      // create unique file name
       const fileName = `${Date.now()}-${user._id}${fileExtension}`;
 
       // check if file exists
       if (user.photo?.name) {
         const photo = ref(storage, `photos/${user.photo?.name}`);
-        await deleteObject(photo);
+        await deleteObject(photo); // delete photo from storage
       }
 
       const photo = ref(storage, `photos/${fileName}`);
-      // upload file
       const uploadedPhoto = await uploadBytes(photo, file.buffer);
-      // get uploaded file url
       const uploadedFileURI = getDownloadURL(uploadedPhoto.ref);
 
       // store file data
@@ -258,6 +266,7 @@ export const controller = {
     const { oldEmail, newEmail, password } = body;
 
     try {
+      // find user by email
       const user = await User.findOne({ email: oldEmail });
       if (!user) throw new Error('User account not registered');
 
@@ -292,14 +301,18 @@ export const controller = {
     try {
       const { email, oldPassword, newPassword } = body;
 
+      // find user by email
       const user = await User.findOne({ email: email });
       if (!user) throw new Error(`User account not found`);
 
+      // check if password is correct
       const isPasswordValid = isMatch(oldPassword, user.password);
       if (!isPasswordValid) throw new Error('Incorrect password, try again');
 
+      // encrypt new password
       const encryptedPassword = encrypt(newPassword);
 
+      // store new password
       const updatedUser = await User.findByIdAndUpdate(
         { email: email },
         { password: encryptedPassword }
@@ -325,20 +338,19 @@ export const controller = {
     const TIME_TO_ADD = 15 * 1000;
 
     try {
-      const { id } = params;
+      const { userId } = params;
 
-      const user = await User.findById(id);
+      // find user by id
+      const user = await User.findById(userId);
       if (!user) throw new Error('User account not found');
 
-      const code = Math.floor(Math.random() * 100000);
+      const code = Math.floor(Math.random() * 1000000);
       const expiresAt = Date.now() + TIME_TO_ADD;
 
+      // store otp data
       const storeOtp = await User.findByIdAndUpdate(
-        id,
-        {
-          'otp.code': code,
-          'otp.expiresAt': expiresAt,
-        },
+        userId,
+        { 'otp.code': code, 'otp.expiresAt': expiresAt },
         { new: true }
       );
 
@@ -361,19 +373,23 @@ export const controller = {
     const { response } = useResponse(res);
 
     try {
-      const { id, otp } = body;
+      const { userId, otp } = body;
 
-      const user = await User.findById(id);
+      // find user by id
+      const user = await User.findById(userId);
       if (!user) throw new Error('User account not found');
 
+      // check if user otp code has expired
       const hasCodeExpired = Date.now() > user.otp.expiresAt;
       if (hasCodeExpired) throw new Error('One Time Password has expired');
 
+      // check if user otp code has expired
       const isCodeOk = user.otp.code === otp.code;
       if (!isCodeOk) throw new Error('Invalid One Time Password');
 
+      // unset otp data
       const unsetOtp = await User.findByIdAndUpdate(
-        id,
+        userId,
         { 'otp.code': '', 'otp.expiresAt': 0 },
         { new: true }
       );
@@ -404,13 +420,13 @@ export const controller = {
 
       if (!userToFollow || !follower) throw new Error('User account not found');
 
-      const alreadyFollowed = userToFollow.followers.includes(followerId);
-      const followUser = [...userToFollow.followers, followerId];
-      const unFollowUser = userToFollow.followers.filter(
-        (id) => id !== followerId
-      );
+      const { pop, push, includes } = useArray(userToFollow.followers);
 
-      const data = alreadyFollowed ? unFollowUser : followUser;
+      const hasFollowedUser = includes(followerId);
+      const followUser = push(followerId);
+      const unFollowUser = pop(followerId);
+
+      const data = hasFollowedUser ? unFollowUser : followUser;
 
       const storedFollowers = await User.findByIdAndUpdate(
         userId,
@@ -424,7 +440,7 @@ export const controller = {
       return response({
         type: 'SUCCESS',
         code: 200,
-        message: alreadyFollowed ? unFollowMessage : followMessage,
+        message: hasFollowedUser ? unFollowMessage : followMessage,
         data: storedFollowers?.followers,
       });
     } catch (error) {
@@ -445,9 +461,11 @@ export const controller = {
       const user = await User.findById(userId);
       if (!user) throw new Error('User not found');
 
-      const isProductSaved = user.saved.includes(productId);
-      const saveProduct = [...user.saved, productId];
-      const removeProduct = user.saved.filter((id) => id !== productId);
+      const { pop, push, includes } = useArray(user.saved);
+
+      const isProductSaved = includes(productId);
+      const saveProduct = push(productId);
+      const removeProduct = pop(productId);
 
       const data = isProductSaved ? saveProduct : removeProduct;
 
