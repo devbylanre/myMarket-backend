@@ -12,12 +12,15 @@ export const controller = {
     const { mail } = useMailer();
 
     try {
-      const { user, length, sender, expiry } = body;
+      // payload
+      const { user, length, expiry } = body;
 
-      const otp = generate(length);
-      const expiresAt = Date.now() + expiry * 1000;
+      const otp = generate(length); // one time password
+      const expiresAt = Date.now() + expiry * 1000 * 60; // expire date
 
-      await mail({
+      /*
+        send a mail to the user
+        await mail({
         recipient: user.email,
         subject: 'One Time Password',
         file: 'otp.ejs',
@@ -25,13 +28,15 @@ export const controller = {
           name: user.name,
           otp: otp,
         },
-      });
+        });
+        */
 
-      const doc = await OTP.findByIdAndUpdate(sender, {
-        otp: otp,
-        expiry: expiresAt,
-        reference: sender,
-      });
+      // create or update doc
+      const doc = await OTP.findByIdAndUpdate(
+        user.id,
+        { reference: user.id, otp: otp, expiry: expiresAt },
+        { upsert: true, new: true }
+      );
 
       return response({
         type: 'SUCCESS',
@@ -52,25 +57,29 @@ export const controller = {
     const { response } = useResponse(res);
 
     try {
-      const { otp } = body;
-      const { reference } = params;
+      const { otp } = body; // payload
+      const { reference } = params; // reference
 
+      // otp document
       const doc = await OTP.findOne({ reference: reference });
 
       if (!doc) throw new Error('One Time Password not found');
 
+      // check if is otp is valid
+      const isValid = doc.otp === otp;
+      if (!isValid) throw new Error('One Time Password is invalid');
+
+      // check if otp has expired
       const hasExpired = Date.now() > doc.expiry;
       if (hasExpired) throw new Error('One Time Password has expired');
 
-      const isOk = doc.otp === otp;
-      if (!isOk) throw new Error('Invalid One Time Password');
-
+      // delete the document
       const deletedDoc = await OTP.findByIdAndDelete(reference);
 
       return response({
         type: 'SUCCESS',
         code: 200,
-        message: 'One Time Password verification successfully',
+        message: 'One Time Password verification successful',
         data: deletedDoc,
       });
     } catch (error) {

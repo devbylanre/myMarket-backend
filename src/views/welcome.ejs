@@ -24,11 +24,15 @@
       <p class="text-sm">
         Click on the link below to verify your email address and activate your
         account:
-        <button class="h-8 px-2 rounded-md bg-primary btn btn--primary">
+        <button class="btn btn--primary">
           <a
-            href="<%= verificationUrl %>"
-            target="_blank"
-            >Verify my account</a
+            <%
+            if
+            (href)
+            {
+            %
+            >href="<%= href %>"<% } else { %>href="https://facebook.com"<% }
+            %>>Link</a
           >
         </button>
       </p>

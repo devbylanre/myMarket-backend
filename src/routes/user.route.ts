@@ -11,8 +11,6 @@ import {
   updateRoute,
   uploadPhotoRoute,
   verifyEmailRoute,
-  generateOTPRoute,
-  verifyOTPRoute,
   followRoute,
 } from '../validations/user.validation';
 
@@ -55,18 +53,6 @@ userRouter.post(
   '/password/change',
   validate(changePasswordRoute),
   controller.changePassword
-);
-
-userRouter.post(
-  '/otp/generate',
-  validate(generateOTPRoute),
-  controller.generateOneTimePassword
-);
-
-userRouter.post(
-  'otp/verify',
-  validate(verifyOTPRoute),
-  controller.verifyOneTimePassword
 );
 
 userRouter.post('/followers', validate(followRoute), controller.follow);

@@ -86,7 +86,7 @@ const controller = {
       const token = sign({ id: user._id }, '24d'); // create json web token
       const expiresAt = expire(token); // get token expiration time
 
-      const { otp, verification, password, ...data } = user.toObject();
+      const { verification, password, ...data } = user.toObject();
 
       return response({
         type: 'SUCCESS',
@@ -110,7 +110,7 @@ const controller = {
       const user = await User.findById(userId);
       if (!user) throw new Error('User account not found');
 
-      const { otp, verification, password, ...data } = user.toObject();
+      const { verification, password, ...data } = user.toObject();
 
       return response({
         type: 'SUCCESS',
@@ -308,82 +308,6 @@ const controller = {
         code: 200,
         message: 'Password updated successfully',
         data: email,
-      });
-    } catch (error) {
-      return response({
-        type: 'ERROR',
-        code: 500,
-        message: (error as Error).message,
-      });
-    }
-  },
-
-  generateOneTimePassword: async ({ body }: Request, res: Response) => {
-    const { response } = useResponse(res);
-    const TIME_TO_ADD = 15 * 1000;
-
-    try {
-      const { userId } = body;
-
-      // find user by id
-      const user = await User.findById(userId);
-      if (!user) throw new Error('User account not found');
-
-      const code = Math.floor(Math.random() * 1000000);
-      const expiresAt = Date.now() + TIME_TO_ADD;
-
-      // store otp data
-      const storeOtp = await User.findByIdAndUpdate(
-        userId,
-        { 'otp.code': code, 'otp.expiresAt': expiresAt },
-        { new: true }
-      );
-
-      return response({
-        type: 'SUCCESS',
-        code: 200,
-        message: 'One Time Password generated successfully',
-        data: storeOtp?.otp,
-      });
-    } catch (error) {
-      return response({
-        type: 'ERROR',
-        code: 500,
-        message: (error as Error).message,
-      });
-    }
-  },
-
-  verifyOneTimePassword: async ({ body }: Request, res: Response) => {
-    const { response } = useResponse(res);
-
-    try {
-      const { userId, code } = body;
-
-      // find user by id
-      const user = await User.findById(userId);
-      if (!user) throw new Error('User account not found');
-
-      // check if user otp code has expired
-      const hasCodeExpired = Date.now() > user.otp.expiresAt;
-      if (hasCodeExpired) throw new Error('One Time Password has expired');
-
-      // check if user otp code has expired
-      const isCodeOk = code === user.otp.code;
-      if (!isCodeOk) throw new Error('Invalid One Time Password');
-
-      // unset otp data
-      const unsetOtp = await User.findByIdAndUpdate(
-        userId,
-        { 'otp.code': '', 'otp.expiresAt': 0 },
-        { new: true }
-      );
-
-      return response({
-        type: 'SUCCESS',
-        code: 200,
-        message: 'One Time Password verification successfully',
-        data: unsetOtp?.otp,
       });
     } catch (error) {
       return response({

@@ -44,6 +44,10 @@ export const useValidate = () => {
     return body(field, `${label} must be a valid email address`).isEmail();
   };
 
+  const isNumber = (field: string, label: string) => {
+    return body(field, `${label} must be a valid number`).isNumeric();
+  };
+
   const isStrongPassword = (field: string, label: string) => {
     return body(
       field,
@@ -67,5 +71,5 @@ export const useValidate = () => {
     return param(field, message);
   };
 
-  return { validate, isString, isEmail, isMongoId, isStrongPassword };
+  return { validate, isString, isNumber, isEmail, isMongoId, isStrongPassword };
 };

@@ -40,15 +40,6 @@ const changePasswordRoute = [
   isStrongPassword('newPassword', ' New password'),
 ];
 
-const generateOTPRoute = [isMongoId('body', 'userId', 'User')];
-
-const verifyOTPRoute = [
-  isMongoId('body', 'userId', 'User'),
-  isString('code', 'One Time Password code')
-    .isLength({ min: 6 })
-    .withMessage('One Time Password must be 6 characters'),
-];
-
 const followRoute = [
   isMongoId('body', 'userId', 'User'),
   isMongoId('body', 'follower', 'Follower'),
@@ -63,7 +54,5 @@ export {
   uploadPhotoRoute,
   changeEmailRoute,
   changePasswordRoute,
-  generateOTPRoute,
-  verifyOTPRoute,
   followRoute,
 };

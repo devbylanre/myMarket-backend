@@ -31,11 +31,6 @@ type Store = {
   location: Location;
 };
 
-type Otp = {
-  code: string;
-  expiresAt: number;
-};
-
 type Account = {
   platform: string;
   url: string;
@@ -59,7 +54,6 @@ export type UserDoc = Document & {
   followers: Schema.Types.ObjectId[];
   pinned: Schema.Types.ObjectId[];
   store: Store;
-  otp: Otp;
   accounts: Account[];
   photo: Photo;
 };
@@ -98,10 +92,6 @@ const userSchema = new Schema<UserDoc>(
         city: { type: String, default: '' },
         address: { type: String, default: '' },
       },
-    },
-    otp: {
-      code: { type: String, default: '' },
-      expiresAt: { type: Number, default: 0 },
     },
     accounts: [
       {
