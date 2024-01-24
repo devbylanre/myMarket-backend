@@ -1,24 +1,26 @@
 import mongoose, { Schema, Types } from 'mongoose';
 
-export interface IProduct {
+type Image = {
+  name: string;
+  url: string;
+};
+
+export type ProductDoc = Document & {
   title: string;
   tagline: string;
   description: string;
   brand: string;
   model: string;
   category: string;
-  images: {
-    name: string;
-    url: string;
-  }[];
-  tags: string[];
   price: number;
   discount: number;
   user: Types.ObjectId;
   views: number;
-}
+  tags: string[];
+  images: Image[];
+};
 
-const productSchema = new Schema<IProduct>({
+const productSchema = new Schema<ProductDoc>({
   title: { type: String, required: true },
   tagline: { type: String, required: true },
   description: { type: String, required: true },
@@ -26,16 +28,15 @@ const productSchema = new Schema<IProduct>({
   model: { type: String, required: true },
   category: { type: String, required: true },
   views: { type: Number, default: 0 },
+  price: { type: Number, required: true },
+  discount: { type: Number, default: 0 },
+  user: { type: Schema.Types.ObjectId, required: true, ref: 'Users' },
   images: [
     {
       name: { type: String, required: true },
       url: { type: String, required: true },
-      _id: false,
     },
   ],
-  price: { type: Number, required: true },
-  discount: { type: Number, default: 0 },
-  user: { type: Schema.Types.ObjectId, required: true },
 });
 
-export const Product = mongoose.model<IProduct>('Product', productSchema);
+export const Product = mongoose.model<ProductDoc>('Products', productSchema);

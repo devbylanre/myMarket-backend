@@ -1,5 +1,5 @@
 import express from 'express';
-import config from './config';
+import config from './configs/config';
 import mongoose from 'mongoose';
 import path from 'path';
 import cors from 'cors';

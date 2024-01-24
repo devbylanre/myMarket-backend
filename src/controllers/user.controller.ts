@@ -1,27 +1,14 @@
-import { Types } from 'mongoose';
 import { User } from '../models/user.model';
 import { Request, Response } from 'express';
 import crypto from 'crypto';
-import config from '../config';
+import config from '../configs/config';
 import { createNotification } from './notification.controller';
 import { useMailer } from '../lib/useMailer';
-import path from 'path';
-import { initializeApp } from 'firebase/app';
-import {
-  deleteObject,
-  getDownloadURL,
-  getStorage,
-  ref,
-  uploadBytes,
-} from 'firebase/storage';
 import { useResponse } from '../lib/useResponse';
 import { usePassword } from '../lib/usePassword';
 import { useToken } from '../lib/useToken';
-import { Product } from '../models/product.model';
 import { useArray } from '../lib/useArray';
-
-const firebaseApp = initializeApp(config.firebase);
-const storage = getStorage(firebaseApp);
+import { useFirebase } from '../lib/useFirebase';
 
 export const controller = {
   create: async ({ body }: Request, res: Response) => {
@@ -216,6 +203,7 @@ export const controller = {
 
   uploadPhoto: async ({ file, body: { id } }: Request, res: Response) => {
     const { response } = useResponse(res);
+    const { deleteFile, uploadFile, fileName, getUrl } = useFirebase();
 
     try {
       // throe error if no file was uploaded
@@ -225,23 +213,20 @@ export const controller = {
       const user = await User.findById(id);
       if (!user) throw new Error('User account not found');
 
-      const fileExtension = path.extname(file.originalname);
-      const fileName = `${Date.now()}-${user._id}${fileExtension}`;
-
       // check if file exists
       if (user.photo?.name) {
-        const photo = ref(storage, `photos/${user.photo?.name}`);
-        await deleteObject(photo); // delete photo from storage
+        const photo = user.photo.name;
+        await deleteFile(photo, '/photos'); // delete photo from storage
       }
 
-      const photo = ref(storage, `photos/${fileName}`);
-      const uploadedPhoto = await uploadBytes(photo, file.buffer);
-      const uploadedFileURI = getDownloadURL(uploadedPhoto.ref);
+      const photoName = fileName(file.originalname, id);
+      const photo = await uploadFile(file.buffer, photoName, '/photos');
+      const photoUrl = getUrl(photo.ref);
 
       // store file data
       const savedPhoto = await User.findByIdAndUpdate(
         id,
-        { 'photo.name': fileName, 'photo.url': uploadedFileURI },
+        { 'photo.name': photoName, 'photo.url': photoUrl },
         { new: true }
       );
 
@@ -415,17 +400,22 @@ export const controller = {
     try {
       const { userId, followerId } = body;
 
+      // find user to follow by id
       const userToFollow = await User.findById(userId);
+      // find follower by id
       const follower = await User.findById(followerId);
 
+      // throw error if userToFollow or follower is not found
       if (!userToFollow || !follower) throw new Error('User account not found');
 
+      // hook
       const { pop, push, includes } = useArray(userToFollow.followers);
 
       const hasFollowedUser = includes(followerId);
       const followUser = push(followerId);
       const unFollowUser = pop(followerId);
 
+      // determine whether to follow or un follow user
       const data = hasFollowedUser ? unFollowUser : followUser;
 
       const storedFollowers = await User.findByIdAndUpdate(
@@ -458,31 +448,66 @@ export const controller = {
     try {
       const { userId, productId } = body;
 
+      // find user by id
       const user = await User.findById(userId);
+      // throw error if user is not found
       if (!user) throw new Error('User not found');
 
-      const { pop, push, includes } = useArray(user.saved);
+      // hook
+      const { pop, push, includes } = useArray(user.pinned);
 
-      const isProductSaved = includes(productId);
-      const saveProduct = push(productId);
-      const removeProduct = pop(productId);
+      const isProductPinned = includes(productId);
+      const pinProduct = push(productId);
+      const unpinProduct = pop(productId);
 
-      const data = isProductSaved ? saveProduct : removeProduct;
+      // determine whether product should be saved or removed
+      const data = isProductPinned ? unpinProduct : pinProduct;
 
-      const updatedUser = await User.findByIdAndUpdate(
+      const storeProducts = await User.findByIdAndUpdate(
         userId,
         { saved: data },
         { new: true }
       );
 
-      const saveMessage = 'Product saved successfully';
-      const removeMessage = 'Product removed successfully';
+      const pinnedMessage = 'Product saved successfully';
+      const unpinnedMessage = 'Product removed successfully';
 
       return response({
         type: 'SUCCESS',
         code: 200,
-        message: isProductSaved ? removeMessage : saveMessage,
-        data: updatedUser?.saved,
+        message: isProductPinned ? unpinnedMessage : pinnedMessage,
+        data: storeProducts?.pinned,
+      });
+    } catch (error) {
+      return response({
+        type: 'ERROR',
+        code: 500,
+        message: (error as Error).message,
+      });
+    }
+  },
+
+  getSavedProducts: async ({ params }: Request, res: Response) => {
+    const { response } = useResponse(res);
+
+    try {
+      const { userId } = params;
+
+      const user = await User.findById(userId);
+      if (!user) throw new Error('Unable to find user account');
+
+      const pinnedProducts = await User.findById(userId)
+        .select('firstName lastName email _id')
+        .populate('pinned');
+
+      if (!pinnedProducts || pinnedProducts.pinned.length === 0)
+        throw new Error('Your pinned library is empty');
+
+      return response({
+        type: 'SUCCESS',
+        code: 200,
+        message: 'Here is your pinned products',
+        data: pinnedProducts.pinned,
       });
     } catch (error) {
       return response({

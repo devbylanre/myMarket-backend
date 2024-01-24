@@ -1,221 +1,165 @@
-import { validationResult } from 'express-validator';
 import { Request, Response } from 'express';
-import { IProduct, Product } from '../models/product.model';
+import { Product } from '../models/product.model';
+import { useResponse } from '../lib/useResponse';
+import { AuthRequest } from '../middlewares/useAuth';
+import { useFirebase } from '../lib/useFirebase';
 
-// firebase
-import { initializeApp } from 'firebase/app';
-import {
-  deleteObject,
-  getDownloadURL,
-  getStorage,
-  ref,
-  uploadBytes,
-} from 'firebase/storage';
+export default {
+  create: async ({ body, user, files }: AuthRequest, res: Response) => {
+    const { response } = useResponse(res);
+    const { uploadFile, fileName, getUrl } = useFirebase();
 
-// config file
-import config from '../config';
-import path from 'path';
-import mongoose from 'mongoose';
+    try {
+      if (!files || files.length === 0)
+        throw new Error('No image was uploaded');
 
-const firebaseApp = initializeApp(config.firebase);
-const storage = getStorage(firebaseApp);
+      const images = await Promise.all(
+        (files as Express.Multer.File[]).map(async (file) => {
+          try {
+            const name = fileName(file.originalname, 'product');
+            const image = await uploadFile(file.buffer, name, 'products/');
+            const url = getUrl(image.ref);
 
-// export const controller = {
-//   create: async (req: IAuthRequest, res: Response) => {
-//     try {
-//       const data = req.body;
-//       const images = req.files as Express.Multer.File[];
+            return { image, url };
+          } catch (error) {
+            throw new Error(
+              `Error uploading images: ${(error as Error).message}`
+            );
+          }
+        })
+      );
 
-//       if (!images) {
-//         return handleResponse.error({
-//           res: res,
-//           status: 400,
-//           message: 'At least one image is required to create a product',
-//         });
-//       }
+      const product = await Product.create({ ...body, user, images });
 
-//       const uploadedImages: { name: string; url: string }[] = [];
+      return response({
+        type: 'SUCCESS',
+        code: 201,
+        message: 'Product created successfully',
+        data: product,
+      });
+    } catch (error) {
+      return response({
+        type: 'ERROR',
+        code: 500,
+        message: (error as Error).message,
+      });
+    }
+  },
 
-//       const uploadImages = images!.map(async (file: Express.Multer.File) => {
-//         const encrypted = `${
-//           path.parse(file.originalname).name
-//         }-${Date.now().toString()}${path.extname(file.originalname)}`;
+  getOne: async ({ params }: AuthRequest, res: Response) => {
+    const { response } = useResponse(res);
 
-//         const fileRef = ref(storage, `products/images/${encrypted}`);
-//         await uploadBytes(fileRef, file.buffer);
+    try {
+      const { productId } = params;
+      const product = await Product.findById(productId).populate(
+        'user',
+        '-otp -verification -password'
+      );
 
-//         const imageUrl = await getDownloadURL(fileRef);
+      if (!product) throw new Error('Unable to find product');
 
-//         uploadedImages.push({ name: encrypted, url: imageUrl });
-//       });
+      return response({
+        type: 'SUCCESS',
+        code: 200,
+        message: 'Product fetched successfully',
+        data: product,
+      });
+    } catch (error) {
+      return response({
+        type: 'ERROR',
+        code: 500,
+        message: (error as Error).message,
+      });
+    }
+  },
 
-//       await Promise.all(uploadImages);
+  getAll: async ({ params }: Request, res: Response) => {
+    const { response } = useResponse(res);
 
-//       const product = await Product.create({
-//         ...data,
-//         images: uploadedImages,
-//         user: req.user,
-//       });
+    try {
+      const products = await Product.find(params).populate(
+        'user',
+        '-otp -verification -password'
+      );
 
-//       return handleResponse.success({
-//         res: res,
-//         status: 201,
-//         message: 'Product created successfully',
-//         data: product,
-//       });
-//     } catch (error: any) {
-//       return handleResponse.error({
-//         res: res,
-//         status: 500,
-//         message: error.message,
-//       });
-//     }
-//   },
+      if (!products || products.length === 0)
+        throw new Error('No product was found');
 
-//   update: async (req: IAuthRequest, res: Response) => {
-//     try {
-//       const data = req.body;
-//       const { id } = req.params;
+      return response({
+        type: 'SUCCESS',
+        code: 200,
+        message: 'Products fetched successfully',
+        data: products,
+      });
+    } catch (error) {
+      return response({
+        type: 'ERROR',
+        code: 500,
+        message: (error as Error).message,
+      });
+    }
+  },
 
-//       const product = await Product.findByIdAndUpdate(id, data);
+  update: async ({ body, params }: Request, res: Response) => {
+    const { response } = useResponse(res);
 
-//       if (!product) {
-//         return handleResponse.error({
-//           res: res,
-//           status: 404,
-//           message: 'Product not found',
-//         });
-//       }
+    try {
+      const { productId } = params;
 
-//       return handleResponse.success({
-//         res: res,
-//         status: 200,
-//         message: 'Product updated successfully',
-//         data: data,
-//       });
-//     } catch (error: any) {
-//       return handleResponse.error({
-//         res: res,
-//         status: 500,
-//         message: error.message,
-//       });
-//     }
-//   },
+      const product = await Product.findByIdAndUpdate(productId, body, {
+        new: true,
+      });
+      if (!product) throw new Error('Unable to find and update product');
 
-//   delete: async (req: Request, res: Response) => {
-//     try {
-//       const { id } = req.params;
+      return response({
+        type: 'SUCCESS',
+        code: 200,
+        message: 'Product updated successfully',
+        data: body,
+      });
+    } catch (error) {
+      return response({
+        type: 'ERROR',
+        code: 500,
+        message: (error as Error).message,
+      });
+    }
+  },
 
-//       const product = await Product.findById(id);
+  delete: async ({ params }: Request, res: Response) => {
+    const { response } = useResponse(res);
+    const { deleteFile } = useFirebase();
 
-//       if (!product) {
-//         return handleResponse.error({
-//           res: res,
-//           status: 404,
-//           message: 'Product not found',
-//         });
-//       }
+    try {
+      const { productId } = params;
 
-//       const deleteImages = product.images.map(async (image) => {
-//         const imageRef = ref(storage, `products/images/${image.name}`);
-//         await deleteObject(imageRef);
-//       });
+      const product = await Product.findById(productId);
+      if (!product) throw new Error('Unable to find product');
 
-//       await Promise.all(deleteImages);
+      const deleteImages = await Promise.all(
+        product.images.map(async (image) => {
+          try {
+            await deleteFile(image.name, '/products');
+          } catch (error) {
+            throw new Error(
+              `Unable to delete images: ${(error as Error).message}`
+            );
+          }
+        })
+      );
 
-//       await Product.findByIdAndDelete(product._id);
-
-//       return handleResponse.success({
-//         res: res,
-//         status: 200,
-//         message: 'Product deleted successfully',
-//         data: { _id: product._id, title: product.title },
-//       });
-//     } catch (error: any) {
-//       return handleResponse.error({
-//         res: res,
-//         status: 500,
-//         message: error.message,
-//       });
-//     }
-//   },
-
-//   fetch: async (req: Request, res: Response) => {
-//     try {
-//       const { id } = req.params;
-
-//       const product = await Product.aggregate([
-//         {
-//           $match: {
-//             _id: new mongoose.Types.ObjectId(id),
-//           },
-//         },
-//         {
-//           $lookup: {
-//             from: 'users',
-//             localField: 'user',
-//             foreignField: '_id',
-//             as: 'seller',
-//           },
-//         },
-//       ]);
-
-//       if (!product || product.length === 0) {
-//         return handleResponse.error({
-//           res: res,
-//           status: 404,
-//           message: 'Product not found',
-//         });
-//       }
-
-//       const seller = product[0].seller[0];
-//       const { password, verification, otp, ...sellerData } = seller;
-
-//       const { seller: _, ...productData } = product[0];
-
-//       return handleResponse.success({
-//         res: res,
-//         status: 200,
-//         message: 'Product fetched successfully',
-//         data: { ...productData, seller: { ...sellerData } },
-//       });
-//     } catch (error: any) {
-//       return handleResponse.error({
-//         res: res,
-//         status: 500,
-//         message: error.message,
-//       });
-//     }
-//   },
-
-//   fetchAll: async (req: Request, res: Response) => {
-//     try {
-//       const query = req.query;
-
-//       const products = await Product.find(query)
-//         .sort((query.sort as any) || '1')
-//         .limit(parseInt(query.limit as string) || 0);
-
-//       if (!products || products.length === 0) {
-//         return handleResponse.error({
-//           res: res,
-//           status: 404,
-//           message: 'No product was found',
-//         });
-//       }
-
-//       return handleResponse.success({
-//         res: res,
-//         status: 200,
-//         message: 'Products fetched successfully',
-//         data: products,
-//       });
-//     } catch (error: any) {
-//       return handleResponse.error({
-//         res: res,
-//         status: 500,
-//         message: error.message,
-//       });
-//     }
-//   },
-// };
+      return response({
+        type: 'SUCCESS',
+        code: 200,
+        message: 'Product deleted successfully',
+        data: product,
+      });
+    } catch (error) {
+      return response({
+        type: 'ERROR',
+        code: 500,
+        message: (error as Error).message,
+      });
+    }
+  },
+};

@@ -57,7 +57,7 @@ export type UserDoc = Document & {
   mobile: Mobile;
   billing: Billing;
   followers: Schema.Types.ObjectId[];
-  saved: Schema.Types.ObjectId[];
+  pinned: Schema.Types.ObjectId[];
   store: Store;
   otp: Otp;
   accounts: Account[];
@@ -88,7 +88,7 @@ const userSchema = new Schema<UserDoc>(
       address: { type: String, default: '' },
     },
     followers: [{ type: Schema.Types.ObjectId, ref: 'Users' }],
-    saved: [{ type: Schema.Types.Boolean, ref: 'Products' }],
+    pinned: [{ type: Schema.Types.Boolean, ref: 'Products' }],
     store: {
       name: { type: String, default: '' },
       description: { type: String, default: '' },

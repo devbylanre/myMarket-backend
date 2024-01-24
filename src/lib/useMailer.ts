@@ -1,5 +1,5 @@
 import nodemailer from 'nodemailer';
-import config from '../config';
+import mailConfig from '../configs//mail';
 import ejs, { Data } from 'ejs';
 import path from 'path';
 
@@ -16,8 +16,8 @@ const transporter = nodemailer.createTransport({
   service: 'gmail',
   port: 587,
   auth: {
-    user: config.gmail.user,
-    pass: config.gmail.password,
+    user: mailConfig.user,
+    pass: mailConfig.password,
   },
 });
 

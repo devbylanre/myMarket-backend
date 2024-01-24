@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt, { JwtPayload } from 'jsonwebtoken';
-import config from '../config';
+import config from '../configs/config';
 import { Types } from 'mongoose';
 import { useToken } from '../lib/useToken';
 import { useResponse } from '../lib/useResponse';
