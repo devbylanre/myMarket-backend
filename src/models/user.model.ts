@@ -11,26 +11,6 @@ type Mobile = {
   number: number;
 };
 
-type Billing = {
-  country: string;
-  state: string;
-  city: string;
-  address: string;
-};
-
-type Location = {
-  country: string;
-  state: string;
-  city: string;
-  address: string;
-};
-
-type Store = {
-  name: string;
-  description: string;
-  location: Location;
-};
-
 type Account = {
   platform: string;
   url: string;
@@ -50,10 +30,8 @@ export type UserDoc = Document & {
   bio: string;
   verification: Verification;
   mobile: Mobile;
-  billing: Billing;
   followers: Schema.Types.ObjectId[];
   pinned: Schema.Types.ObjectId[];
-  store: Store;
   accounts: Account[];
   photo: Photo;
 };
@@ -75,24 +53,8 @@ const userSchema = new Schema<UserDoc>(
       code: { type: Number, default: 234 },
       number: { type: Number, default: 0 },
     },
-    billing: {
-      country: { type: String, default: '' },
-      state: { type: String, default: '' },
-      city: { type: String, default: '' },
-      address: { type: String, default: '' },
-    },
     followers: [{ type: Schema.Types.ObjectId, ref: 'Users' }],
     pinned: [{ type: Schema.Types.Boolean, ref: 'Products' }],
-    store: {
-      name: { type: String, default: '' },
-      description: { type: String, default: '' },
-      location: {
-        country: { type: String, default: '' },
-        state: { type: String, default: '' },
-        city: { type: String, default: '' },
-        address: { type: String, default: '' },
-      },
-    },
     accounts: [
       {
         platform: { type: String },

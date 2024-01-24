@@ -8,7 +8,8 @@ import cors from 'cors';
 import productRouter from './routes/product.route';
 import userRouter from './routes/user.route';
 import otpRouter from './routes/otp.route';
-import billingRouter from './routes/biling.route';
+import billingRouter from './routes/billing.route';
+import storeRouter from './routes/store.route';
 
 const app = express();
 
@@ -41,6 +42,7 @@ app.use('/user', userRouter);
 app.use('/product', productRouter);
 app.use('/otps', otpRouter);
 app.use('/billings', billingRouter);
+app.use('/stores', storeRouter);
 
 mongoose
   .connect('mongodb://127.0.0.1:27017/mymarket')

@@ -16,7 +16,7 @@ export const controller = {
       const doc = await Billing.findByIdAndUpdate(
         user.id,
         { country, state, city, address, reference: user.id },
-        { $upsert: true }
+        { upsert: true, new: true }
       );
 
       if (!doc) throw new Error('Unable to create billing');
@@ -28,6 +28,7 @@ export const controller = {
         data: doc,
       });
     } catch (error) {
+      console.log(error);
       return response({
         type: 'ERROR',
         code: 500,
@@ -66,15 +67,26 @@ export const controller = {
     try {
       const { reference } = params;
 
-      const deleteDoc = await Billing.findByIdAndDelete(reference);
-      if (!deleteDoc) throw new Error('Billing data could not be found');
+      const doc = await Billing.findOne({
+        reference: reference,
+      });
+
+      if (!doc) throw new Error('Billing document not found');
+
+      const deleteDoc = await Billing.findByIdAndDelete(doc.id);
 
       return response({
         type: 'SUCCESS',
-        code: 20,
+        code: 200,
         message: 'Billing deleted successfully',
         data: deleteDoc,
       });
-    } catch (error) {}
+    } catch (error) {
+      return response({
+        type: 'ERROR',
+        code: 500,
+        message: (error as Error).message,
+      });
+    }
   },
 };

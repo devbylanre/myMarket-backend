@@ -137,12 +137,6 @@ const controller = {
       const user = await User.findById(userId);
       if (!user) throw new Error('User account not found');
 
-      // check if store name exists
-      const storeAlreadyExists = payload?.store?.name === user?.store?.name;
-
-      if (storeAlreadyExists)
-        throw new Error('Store name has already been taken ');
-
       // update user data
       const updatedUser = await User.findByIdAndUpdate(userId, { ...payload });
 
