@@ -10,7 +10,7 @@ import { useToken } from '../lib/useToken';
 import { useArray } from '../lib/useArray';
 import { useFirebase } from '../lib/useFirebase';
 
-export const controller = {
+const controller = {
   create: async ({ body }: Request, res: Response) => {
     const { mail } = useMailer();
     const { encrypt } = usePassword();
@@ -103,11 +103,11 @@ export const controller = {
     }
   },
 
-  get: async ({ params: { id } }: Request, res: Response) => {
+  get: async ({ params: { userId } }: Request, res: Response) => {
     const { response } = useResponse(res);
     try {
       // find user by id
-      const user = await User.findById(id);
+      const user = await User.findById(userId);
       if (!user) throw new Error('User account not found');
 
       const { otp, verification, password, ...data } = user.toObject();
@@ -127,14 +127,14 @@ export const controller = {
     }
   },
 
-  update: async ({ params: { id }, body }: Request, res: Response) => {
+  update: async ({ params: { userId }, body }: Request, res: Response) => {
     const { response } = useResponse(res);
 
     try {
       const { otp, verification, password, email, ...payload } = body;
 
       // find user by id
-      const user = await User.findById(id);
+      const user = await User.findById(userId);
       if (!user) throw new Error('User account not found');
 
       // check if store name exists
@@ -144,7 +144,7 @@ export const controller = {
         throw new Error('Store name has already been taken ');
 
       // update user data
-      const updatedUser = await User.findByIdAndUpdate(id, { ...payload });
+      const updatedUser = await User.findByIdAndUpdate(userId, { ...payload });
 
       return response({
         type: 'SUCCESS',
@@ -161,11 +161,11 @@ export const controller = {
     }
   },
 
-  emailVerification: async ({ body }: Request, res: Response) => {
+  verifyEmail: async ({ body }: Request, res: Response) => {
     const { response } = useResponse(res);
 
     try {
-      const { email, verification } = body;
+      const { email, token } = body;
 
       // find user by email
       const user = await User.findOne({ email: email });
@@ -177,7 +177,7 @@ export const controller = {
       if (isUserVerified) throw new Error('This email is already verified');
 
       // check if token is valid
-      const isTokenValid = verification.token === user.verification?.token;
+      const isTokenValid = token === user.verification?.token;
       if (!isTokenValid) throw new Error('Verification token is not valid');
 
       // unset verification data
@@ -201,7 +201,7 @@ export const controller = {
     }
   },
 
-  uploadPhoto: async ({ file, body: { id } }: Request, res: Response) => {
+  uploadPhoto: async ({ file, body: { userId } }: Request, res: Response) => {
     const { response } = useResponse(res);
     const { deleteFile, uploadFile, fileName, getUrl } = useFirebase();
 
@@ -210,7 +210,7 @@ export const controller = {
       if (!file) throw new Error('No file was provided');
 
       // find user account
-      const user = await User.findById(id);
+      const user = await User.findById(userId);
       if (!user) throw new Error('User account not found');
 
       // check if file exists
@@ -219,13 +219,13 @@ export const controller = {
         await deleteFile(photo, '/photos'); // delete photo from storage
       }
 
-      const photoName = fileName(file.originalname, id);
+      const photoName = fileName(file.originalname, userId);
       const photo = await uploadFile(file.buffer, photoName, '/photos');
       const photoUrl = getUrl(photo.ref);
 
       // store file data
       const savedPhoto = await User.findByIdAndUpdate(
-        id,
+        userId,
         { 'photo.name': photoName, 'photo.url': photoUrl },
         { new: true }
       );
@@ -318,12 +318,12 @@ export const controller = {
     }
   },
 
-  generateOneTimePassword: async ({ params }: Request, res: Response) => {
+  generateOneTimePassword: async ({ body }: Request, res: Response) => {
     const { response } = useResponse(res);
     const TIME_TO_ADD = 15 * 1000;
 
     try {
-      const { userId } = params;
+      const { userId } = body;
 
       // find user by id
       const user = await User.findById(userId);
@@ -358,7 +358,7 @@ export const controller = {
     const { response } = useResponse(res);
 
     try {
-      const { userId, otp } = body;
+      const { userId, code } = body;
 
       // find user by id
       const user = await User.findById(userId);
@@ -369,7 +369,7 @@ export const controller = {
       if (hasCodeExpired) throw new Error('One Time Password has expired');
 
       // check if user otp code has expired
-      const isCodeOk = user.otp.code === otp.code;
+      const isCodeOk = code === user.otp.code;
       if (!isCodeOk) throw new Error('Invalid One Time Password');
 
       // unset otp data
@@ -442,7 +442,28 @@ export const controller = {
     }
   },
 
-  saveProduct: async ({ body }: Request, res: Response) => {
+  getFollowers: async ({ query }: Request, res: Response) => {
+    const { response } = useResponse(res);
+
+    try {
+      const { userId } = query;
+
+      const user = await User.findById(userId).populate('followers');
+      if (!user) throw new Error('Unable to find user account');
+
+      if (!user.followers || user.followers.length === 0)
+        throw new Error('We could not find any followers');
+
+      return response({
+        type: 'SUCCESS',
+        code: 200,
+        message: 'Followers fetched successfully',
+        data: user,
+      });
+    } catch (error) {}
+  },
+
+  pinProduct: async ({ body }: Request, res: Response) => {
     const { response } = useResponse(res);
 
     try {
@@ -487,7 +508,7 @@ export const controller = {
     }
   },
 
-  getSavedProducts: async ({ params }: Request, res: Response) => {
+  getPinnedProducts: async ({ params }: Request, res: Response) => {
     const { response } = useResponse(res);
 
     try {
@@ -518,3 +539,5 @@ export const controller = {
     }
   },
 };
+
+export default controller;

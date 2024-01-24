@@ -1,8 +1,18 @@
-import { validationResult } from 'express-validator';
+import {
+  Location,
+  ValidationChain,
+  body,
+  param,
+  validationResult,
+} from 'express-validator';
 import { Request, Response, NextFunction } from 'express';
 
 export const useValidate = () => {
-  const validate = (req: Request, res: Response, next: NextFunction) => {
+  const handleValidationErrors = (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ) => {
     const errors = validationResult(req);
     const isEmpty = errors.isEmpty();
 
@@ -12,6 +22,7 @@ export const useValidate = () => {
       const error = array.find((_, i) => i === 0); // first error
 
       return res.status(400).json({
+        status: 'error',
         code: 401,
         message: error?.msg,
       });
@@ -21,5 +32,40 @@ export const useValidate = () => {
     next();
   };
 
-  return { validate };
+  const validate = (validations: ValidationChain[]) => {
+    return [...validations, handleValidationErrors];
+  };
+
+  const isString = (field: string, label: string) => {
+    return body(field, `${label} must be a valid string`).notEmpty().isString();
+  };
+
+  const isEmail = (field: string, label: string) => {
+    return body(field, `${label} must be a valid email address`).isEmail();
+  };
+
+  const isStrongPassword = (field: string, label: string) => {
+    return body(
+      field,
+      `${label} must be at least 8 characters long and contain at least one uppercase, lowercase, and special character`
+    )
+      .notEmpty()
+      .isStrongPassword();
+  };
+
+  const isMongoId = (
+    location: 'body' | 'param',
+    field: string,
+    label: string
+  ) => {
+    const message = `Invalid ${label} ID`;
+
+    if (location === 'body') {
+      return body(field, message);
+    }
+
+    return param(field, message);
+  };
+
+  return { validate, isString, isEmail, isMongoId, isStrongPassword };
 };

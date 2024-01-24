@@ -1,8 +1,20 @@
 import { Router } from 'express';
 import { useUpload } from '../lib/useUpload';
 import { useValidate } from '../lib/useValidate';
-import { rules } from '../validations/user.validation';
-import { controller } from '../controllers/user.controller';
+import controller from '../controllers/user.controller';
+import {
+  authRoute,
+  changeEmailRoute,
+  changePasswordRoute,
+  createRoute,
+  getRoute,
+  updateRoute,
+  uploadPhotoRoute,
+  verifyEmailRoute,
+  generateOTPRoute,
+  verifyOTPRoute,
+  followRoute,
+} from '../validations/user.validation';
 
 const userRouter = Router();
 
@@ -12,36 +24,57 @@ const { validate } = useValidate();
 
 const upload = configure({ fileSize: 2 * 1024 * 1024 });
 
-userRouter.post('/create', rules.create, validate, controller.create);
+userRouter.post('/create', validate(createRoute), controller.create);
 
-userRouter.post('/auth', rules.authenticate, validate, controller.authenticate);
+userRouter.post('/auth', validate(authRoute), controller.authenticate);
 
-userRouter.get('/:id', rules.get, validate, controller.get);
+userRouter.get('/:userId', validate(getRoute), controller.get);
 
-userRouter.patch('/:id', rules.update, validate, controller.update);
+userRouter.patch('/:userId', validate(updateRoute), controller.update);
 
 userRouter.post(
   '/email/verify',
-  rules.verifyEmail,
-  validate,
-  controller.emailVerification
+  validate(verifyEmailRoute),
+  controller.verifyEmail
 );
 
 userRouter.post(
   '/photo/upload',
   upload.single('photo'),
-  validate,
+  validate(uploadPhotoRoute),
   controller.uploadPhoto
 );
 
-userRouter.post('/email/change', validate, controller.changeEmail);
+userRouter.post(
+  '/email/change',
+  validate(changeEmailRoute),
+  controller.changeEmail
+);
 
-userRouter.post('password/change', validate, controller.changePassword);
+userRouter.post(
+  '/password/change',
+  validate(changePasswordRoute),
+  controller.changePassword
+);
 
-userRouter.post('/otp/gen', validate, controller.generateOneTimePassword);
+userRouter.post(
+  '/otp/generate',
+  validate(generateOTPRoute),
+  controller.generateOneTimePassword
+);
 
-userRouter.post('otp/gen', validate, controller.verifyOneTimePassword);
+userRouter.post(
+  'otp/verify',
+  validate(verifyOTPRoute),
+  controller.verifyOneTimePassword
+);
 
-userRouter.post('/follow');
+userRouter.post('/followers', validate(followRoute), controller.follow);
+
+userRouter.get('/followers', validate(followRoute), controller.follow);
+
+userRouter.post('/pinned', validate, controller.pinProduct);
+
+userRouter.get('/pinned');
 
 export default userRouter;
