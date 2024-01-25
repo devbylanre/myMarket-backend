@@ -1,11 +1,10 @@
 import { Request, Response } from 'express';
 import { Product } from '../models/product.model';
 import { useResponse } from '../lib/useResponse';
-import { AuthRequest } from '../middlewares/useAuth';
 import { useFirebase } from '../lib/useFirebase';
 
 export default {
-  create: async ({ body, user, files }: AuthRequest, res: Response) => {
+  create: async ({ body, files }: Request, res: Response) => {
     const { response } = useResponse(res);
     const { uploadFile, fileName, getUrl } = useFirebase();
 
@@ -29,7 +28,11 @@ export default {
         })
       );
 
-      const product = await Product.create({ ...body, user, images });
+      const product = await Product.create({
+        ...body,
+        user: body.userId,
+        images,
+      });
 
       return response({
         type: 'SUCCESS',
@@ -46,7 +49,7 @@ export default {
     }
   },
 
-  getOne: async ({ params }: AuthRequest, res: Response) => {
+  getOne: async ({ params }: Request, res: Response) => {
     const { response } = useResponse(res);
 
     try {

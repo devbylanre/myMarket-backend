@@ -3,7 +3,6 @@ import { OTP } from '../models/otp.model';
 import { useResponse } from '../lib/useResponse';
 import { useMailer } from '../lib/useMailer';
 import { useOTP } from '../lib/useOTP';
-import { send } from 'process';
 
 export const controller = {
   create: async ({ body }: Request, res: Response) => {
@@ -13,7 +12,7 @@ export const controller = {
 
     try {
       // payload
-      const { user, length, expiry } = body;
+      const { length, expiry, userId } = body;
 
       const otp = generate(length); // one time password
       const expiresAt = Date.now() + expiry * 1000 * 60; // expire date
@@ -33,8 +32,8 @@ export const controller = {
 
       // create or update doc
       const doc = await OTP.findByIdAndUpdate(
-        user.id,
-        { reference: user.id, otp: otp, expiry: expiresAt },
+        userId,
+        { reference: userId, otp: otp, expiry: expiresAt },
         { upsert: true, new: true }
       );
 

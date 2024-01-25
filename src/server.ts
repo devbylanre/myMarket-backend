@@ -10,6 +10,7 @@ import userRouter from './routes/user.route';
 import otpRouter from './routes/otp.route';
 import billingRouter from './routes/billing.route';
 import storeRouter from './routes/store.route';
+import mobileRouter from './routes/mobile.route';
 
 const app = express();
 
@@ -43,6 +44,7 @@ app.use('/product', productRouter);
 app.use('/otps', otpRouter);
 app.use('/billings', billingRouter);
 app.use('/stores', storeRouter);
+app.use('/mobiles', mobileRouter);
 
 mongoose
   .connect('mongodb://127.0.0.1:27017/mymarket')

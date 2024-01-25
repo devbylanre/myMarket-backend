@@ -9,13 +9,13 @@ export const controller = {
     const { mail } = useMailer();
 
     try {
-      const { country, state, city, address, user } = body;
+      const { country, state, city, address, userId } = body;
 
       // send an email to the user about his billing information
 
       const doc = await Billing.findByIdAndUpdate(
-        user.id,
-        { country, state, city, address, reference: user.id },
+        userId,
+        { country, state, city, address, reference: userId },
         { upsert: true, new: true }
       );
 

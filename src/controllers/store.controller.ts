@@ -7,11 +7,11 @@ export const controller = {
     const { response } = useResponse(res);
 
     try {
-      const { user, name, ...payload } = body;
+      const { name, userId, ...payload } = body;
 
       const doc = await Store.findByIdAndUpdate(
-        user.id,
-        { name, ...payload, reference: user.id },
+        userId,
+        { name, ...payload, reference: userId },
         { upsert: true, new: true }
       );
 
