@@ -11,7 +11,8 @@ import otpRouter from './routes/otp.route';
 import billingRouter from './routes/billing.route';
 import storeRouter from './routes/store.route';
 import mobileRouter from './routes/mobile.route';
-import communityRoute from './routes/coummunity.route';
+import pinRouter from './routes/pin.route';
+import communityRouter from './routes/community.route';
 
 const app = express();
 
@@ -46,7 +47,8 @@ app.use('/otps', otpRouter);
 app.use('/billings', billingRouter);
 app.use('/stores', storeRouter);
 app.use('/mobiles', mobileRouter);
-app.use('/communities', communityRoute);
+app.use('/communities', communityRouter);
+app.use('/pins', pinRouter);
 
 mongoose
   .connect('mongodb://127.0.0.1:27017/mymarket')
