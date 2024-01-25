@@ -12,15 +12,15 @@ export const controller = {
 
       const existingDoc = await Mobile.findOne({ reference: userId });
 
-      let doc = '' as unknown;
+      let doc: unknown;
 
       if (existingDoc) {
-        doc = await Mobile.updateOne({ reference: userId }, payload, {
+        doc = await Mobile.findOneAndUpdate({ reference: userId }, payload, {
           new: true,
         });
+      } else {
+        doc = await Mobile.create({ ...payload, reference: userId });
       }
-
-      doc = await Mobile.create(payload);
 
       if (!doc) throw new Error('Unable to create document');
 

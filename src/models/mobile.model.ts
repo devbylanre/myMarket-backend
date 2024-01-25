@@ -11,7 +11,7 @@ const mobileSchema = new Schema<MobileDoc>({
   country: { type: String, required: true },
   code: { type: Number, required: true },
   number: { type: Number, required: true },
-  reference: { type: Schema.Types.ObjectId, required: true },
+  reference: { type: Schema.Types.ObjectId, required: true, ref: 'Users' },
 });
 
 export const Mobile = mongoose.model('Mobiles', mobileSchema);

@@ -32,7 +32,7 @@ const controller = {
       const registeredUser = await User.create({
         ...body,
         password: encryptedPassword,
-        'verification.token': token,
+        token: token,
       });
 
       // notify user about successful registration
@@ -86,7 +86,7 @@ const controller = {
       const token = sign({ id: user._id }, '24d'); // create json web token
       const expiresAt = expire(token); // get token expiration time
 
-      const { verification, password, ...data } = user.toObject();
+      const { verified, password, ...data } = user.toObject();
 
       return response({
         type: 'SUCCESS',
@@ -110,7 +110,7 @@ const controller = {
       const user = await User.findById(userId);
       if (!user) throw new Error('User account not found');
 
-      const { verification, password, ...data } = user.toObject();
+      const { password, ...data } = user.toObject();
 
       return response({
         type: 'SUCCESS',
@@ -165,13 +165,13 @@ const controller = {
       const user = await User.findOne({ email: email });
       if (!user) throw new Error('User account not found');
 
-      const isUserVerified = user.verification?.isVerified;
+      const isUserVerified = user.verified;
 
       // check if user is verified
       if (isUserVerified) throw new Error('This email is already verified');
 
       // check if token is valid
-      const isTokenValid = token === user.verification?.token;
+      const isTokenValid = token === user.token;
       if (!isTokenValid) throw new Error('Verification token is not valid');
 
       // unset verification data
@@ -302,151 +302,6 @@ const controller = {
         code: 200,
         message: 'Password updated successfully',
         data: email,
-      });
-    } catch (error) {
-      return response({
-        type: 'ERROR',
-        code: 500,
-        message: (error as Error).message,
-      });
-    }
-  },
-
-  follow: async ({ body }: Request, res: Response) => {
-    const { response } = useResponse(res);
-
-    try {
-      const { userId, followerId } = body;
-
-      // find user to follow by id
-      const userToFollow = await User.findById(userId);
-      // find follower by id
-      const follower = await User.findById(followerId);
-
-      // throw error if userToFollow or follower is not found
-      if (!userToFollow || !follower) throw new Error('User account not found');
-
-      // hook
-      const { pop, push, includes } = useArray(userToFollow.followers);
-
-      const hasFollowedUser = includes(followerId);
-      const followUser = push(followerId);
-      const unFollowUser = pop(followerId);
-
-      // determine whether to follow or un follow user
-      const data = hasFollowedUser ? unFollowUser : followUser;
-
-      const storedFollowers = await User.findByIdAndUpdate(
-        userId,
-        { followers: data },
-        { new: true }
-      );
-
-      const unFollowMessage = 'You have un-followed this account';
-      const followMessage = 'User followed successfully';
-
-      return response({
-        type: 'SUCCESS',
-        code: 200,
-        message: hasFollowedUser ? unFollowMessage : followMessage,
-        data: storedFollowers?.followers,
-      });
-    } catch (error) {
-      return response({
-        type: 'ERROR',
-        code: 500,
-        message: (error as Error).message,
-      });
-    }
-  },
-
-  getFollowers: async ({ query }: Request, res: Response) => {
-    const { response } = useResponse(res);
-
-    try {
-      const { userId } = query;
-
-      const user = await User.findById(userId).populate('followers');
-      if (!user) throw new Error('Unable to find user account');
-
-      if (!user.followers || user.followers.length === 0)
-        throw new Error('We could not find any followers');
-
-      return response({
-        type: 'SUCCESS',
-        code: 200,
-        message: 'Followers fetched successfully',
-        data: user,
-      });
-    } catch (error) {}
-  },
-
-  pinProduct: async ({ body }: Request, res: Response) => {
-    const { response } = useResponse(res);
-
-    try {
-      const { userId, productId } = body;
-
-      // find user by id
-      const user = await User.findById(userId);
-      // throw error if user is not found
-      if (!user) throw new Error('User not found');
-
-      // hook
-      const { pop, push, includes } = useArray(user.pinned);
-
-      const isProductPinned = includes(productId);
-      const pinProduct = push(productId);
-      const unpinProduct = pop(productId);
-
-      // determine whether product should be saved or removed
-      const data = isProductPinned ? unpinProduct : pinProduct;
-
-      const storeProducts = await User.findByIdAndUpdate(
-        userId,
-        { saved: data },
-        { new: true }
-      );
-
-      const pinnedMessage = 'Product saved successfully';
-      const unpinnedMessage = 'Product removed successfully';
-
-      return response({
-        type: 'SUCCESS',
-        code: 200,
-        message: isProductPinned ? unpinnedMessage : pinnedMessage,
-        data: storeProducts?.pinned,
-      });
-    } catch (error) {
-      return response({
-        type: 'ERROR',
-        code: 500,
-        message: (error as Error).message,
-      });
-    }
-  },
-
-  getPinnedProducts: async ({ params }: Request, res: Response) => {
-    const { response } = useResponse(res);
-
-    try {
-      const { userId } = params;
-
-      const user = await User.findById(userId);
-      if (!user) throw new Error('Unable to find user account');
-
-      const pinnedProducts = await User.findById(userId)
-        .select('firstName lastName email _id')
-        .populate('pinned');
-
-      if (!pinnedProducts || pinnedProducts.pinned.length === 0)
-        throw new Error('Your pinned library is empty');
-
-      return response({
-        type: 'SUCCESS',
-        code: 200,
-        message: 'Here is your pinned products',
-        data: pinnedProducts.pinned,
       });
     } catch (error) {
       return response({

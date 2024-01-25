@@ -11,7 +11,6 @@ import {
   updateRoute,
   uploadPhotoRoute,
   verifyEmailRoute,
-  followRoute,
 } from '../validations/user.validation';
 
 const userRouter = Router();
@@ -54,13 +53,5 @@ userRouter.post(
   validate(changePasswordRoute),
   controller.changePassword
 );
-
-userRouter.post('/followers', validate(followRoute), controller.follow);
-
-userRouter.get('/followers', validate(followRoute), controller.follow);
-
-userRouter.post('/pinned', validate, controller.pinProduct);
-
-userRouter.get('/pinned');
 
 export default userRouter;
