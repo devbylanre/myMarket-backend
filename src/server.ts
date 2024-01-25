@@ -13,6 +13,7 @@ import storeRouter from './routes/store.route';
 import mobileRouter from './routes/mobile.route';
 import pinRouter from './routes/pin.route';
 import communityRouter from './routes/community.route';
+import reviewRouter from './routes/review.route';
 
 const app = express();
 
@@ -49,6 +50,7 @@ app.use('/stores', storeRouter);
 app.use('/mobiles', mobileRouter);
 app.use('/communities', communityRouter);
 app.use('/pins', pinRouter);
+app.use('/reviews', reviewRouter);
 
 mongoose
   .connect('mongodb://127.0.0.1:27017/mymarket')
