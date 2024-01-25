@@ -1,38 +1,77 @@
 import { Request, Response } from 'express';
-import { Notification, NotificationProps } from '../models/notification.model';
+import { Notification } from '../models/notification.model';
 import { useResponse } from '../lib/useResponse';
 
-const createNotification = async (data: NotificationProps) => {
-  const doc = Notification.create(data);
-  return await doc;
+export const controller = {
+  create: async ({ body }: Request, res: Response) => {
+    const { response } = useResponse(res);
+
+    try {
+      // Create a notification
+      const doc = await Notification.create(body);
+      if (!doc) throw new Error('Notification alert failed');
+
+      return response({
+        type: 'SUCCESS',
+        code: 201,
+        message: 'Notification created successfully',
+        data: doc,
+      });
+    } catch (error) {
+      return response({
+        type: 'ERROR',
+        code: 500,
+        message: (error as Error).message,
+      });
+    }
+  },
+
+  read: async (req: Request, res: Response) => {
+    const { response } = useResponse(res);
+
+    try {
+      const { id } = req.params;
+
+      // Find and update the notification
+      const doc = await Notification.findByIdAndUpdate(id, { read: true });
+      if (!doc) throw new Error('Could not find notification');
+
+      return response({
+        type: 'SUCCESS',
+        code: 200,
+        message: 'Notification read',
+        data: doc,
+      });
+    } catch (error) {
+      return response({
+        type: 'ERROR',
+        code: 500,
+        message: (error as Error).message,
+      });
+    }
+  },
+
+  get: async ({ params }: Request, res: Response) => {
+    const { response } = useResponse(res);
+
+    try {
+      const { reference } = params;
+
+      const docs = await Notification.find({ reference });
+      if (!docs || docs.length === 0) throw new Error('No notification found');
+
+      return response({
+        type: 'SUCCESS',
+        code: 200,
+        message: `Found ${docs.length} notifications`,
+        data: docs,
+      });
+    } catch (error) {
+      return response({
+        type: 'ERROR',
+        code: 500,
+        message: (error as Error).message,
+      });
+    }
+  },
 };
-
-const readNotification = async (req: Request, res: Response) => {
-  const { id } = req.params;
-
-  const updateDoc = async () => {
-    const doc = await Notification.findByIdAndUpdate(id, { read: true });
-    return doc;
-  };
-
-  const getDoc = async () => {
-    const doc = await Notification.findById(id);
-    return doc;
-  };
-};
-
-const getNotification = (req: Request, res: Response) => {
-  const { id } = req.params;
-
-  const getDoc = async (req: Request, res: Response) => {
-    const doc = await Notification.findById(id);
-  };
-};
-
-const getNotifications = async (req: Request, res: Response) => {
-  const filter = req.params;
-
-  const docs = await Notification.find(filter);
-};
-
-export { createNotification };

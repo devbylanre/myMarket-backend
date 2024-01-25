@@ -14,6 +14,7 @@ import mobileRouter from './routes/mobile.route';
 import pinRouter from './routes/pin.route';
 import communityRouter from './routes/community.route';
 import reviewRouter from './routes/review.route';
+import tokenRouter from './routes/token.route';
 
 const app = express();
 
@@ -51,6 +52,7 @@ app.use('/mobiles', mobileRouter);
 app.use('/communities', communityRouter);
 app.use('/pins', pinRouter);
 app.use('/reviews', reviewRouter);
+app.use('/tokens', tokenRouter);
 
 mongoose
   .connect('mongodb://127.0.0.1:27017/mymarket')

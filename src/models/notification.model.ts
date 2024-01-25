@@ -9,28 +9,29 @@ type NotificationType<
 > = { type: S };
 
 type Other = {
-  recipient: Types.ObjectId;
+  reference: Types.ObjectId;
   message: string;
   read?: boolean;
   createdAt?: Date;
 };
 
-export type NotificationProps =
-  | (NotificationType<'FOLLOW'> & {
-      sender: Types.ObjectId;
-    } & Other)
-  | (NotificationType<'SIGN_UP'> & Other);
+export type NotificationDoc =
+  | (Document &
+      (NotificationType<'FOLLOW'> & {
+        sender: Types.ObjectId;
+      } & Other))
+  | (Document & NotificationType<'SIGN_UP'> & Other);
 
-const notificationSchema = new Schema<NotificationProps>({
-  sender: { type: Schema.Types.ObjectId },
+const notificationSchema = new Schema<NotificationDoc>({
   type: { type: String, required: true },
   message: { type: String, required: true },
-  recipient: { type: Schema.Types.ObjectId, required: true },
+  reference: { type: Schema.Types.ObjectId, required: true, ref: 'Users' },
+  sender: { type: Schema.Types.ObjectId, ref: 'Users' },
   read: { type: Boolean, default: false, required: true },
   createdAt: { type: Date, default: Date.now(), required: true },
 });
 
-export const Notification = mongoose.model<NotificationProps>(
-  'notification',
+export const Notification = mongoose.model<NotificationDoc>(
+  'Notifications',
   notificationSchema
 );

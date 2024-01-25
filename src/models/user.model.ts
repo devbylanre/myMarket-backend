@@ -1,10 +1,5 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
-type Account = {
-  platform: string;
-  url: string;
-};
-
 type Photo = {
   name: string;
   url: string;
@@ -17,11 +12,8 @@ export type UserDoc = Document & {
   email: string;
   password: string;
   bio: string;
-  token: string;
-  verified: boolean;
-  pinned: Schema.Types.ObjectId[];
-  accounts: Account[];
   photo: Photo;
+  isVerified: boolean;
 };
 
 const userSchema = new Schema<UserDoc>(
@@ -32,15 +24,7 @@ const userSchema = new Schema<UserDoc>(
     email: { type: String, required: true, unique: true },
     password: { type: String, required: true },
     bio: { type: String, required: true },
-    token: { type: String, required: true },
-    verified: { type: Boolean, required: true },
-    pinned: [{ type: Schema.Types.Boolean, ref: 'Products' }],
-    accounts: [
-      {
-        platform: { type: String },
-        url: { type: String },
-      },
-    ],
+    isVerified: { type: Boolean, required: true, default: false },
     photo: {
       name: { type: String, default: '' },
       url: { type: String, default: '' },

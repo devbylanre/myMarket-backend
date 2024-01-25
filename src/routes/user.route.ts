@@ -30,12 +30,6 @@ userRouter.get('/:userId', validate(getRoute), controller.get);
 userRouter.patch('/:userId', validate(updateRoute), controller.update);
 
 userRouter.post(
-  '/email/verify',
-  validate(verifyEmailRoute),
-  controller.verifyEmail
-);
-
-userRouter.post(
   '/photo/upload',
   upload.single('photo'),
   validate(uploadPhotoRoute),
