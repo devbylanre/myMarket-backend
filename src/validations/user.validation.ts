@@ -23,21 +23,21 @@ export const Rules = {
   verify: [isEmail('email', 'Email address')],
 
   update: [
-    isMongoId('param', 'userId', 'User'),
+    isMongoId('body', 'userId', 'User'),
     isString('firstName', 'First name').optional(),
     isString('lastName', 'Last name').optional(),
     isString('bio', 'Bio')
       .optional()
       .isLength({ max: 256 })
       .withMessage('Bio cannot exceed 256 characters'),
-    isStrongPassword('password', 'Password'),
+    isStrongPassword('password', 'Password').optional(),
   ],
 
-  uploadPhoto: [isMongoId('param', 'userId', 'User')],
+  uploadPhoto: [isMongoId('body', 'userId', 'User')],
 
   changeEmail: [
     isMongoId('param', 'userId', 'User'),
-    isEmail('Email', ' New email'),
+    isEmail('email', 'Email'),
     isStrongPassword('password', 'Password'),
   ],
 

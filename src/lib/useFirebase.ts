@@ -16,7 +16,7 @@ export const useFirebase = () => {
 
   const fileName = (originalname: string, id: string) => {
     const extension = path.extname(originalname);
-    const name = `${Date.now()}-${id}${extension}`;
+    const name = `${id}-${Date.now()}${extension}`;
     return name;
   };
 
@@ -35,8 +35,9 @@ export const useFirebase = () => {
     await deleteObject(object);
   };
 
-  const getUrl = (ref: StorageReference) => {
-    const url = getDownloadURL(ref);
+  const getUrl = async (ref: StorageReference) => {
+    const url = await getDownloadURL(ref);
+    return url;
   };
 
   return { fileName, uploadFile, deleteFile, getUrl };

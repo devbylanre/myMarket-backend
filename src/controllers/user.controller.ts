@@ -1,13 +1,13 @@
 import { User } from '../models/user.model';
 import { Request, Response } from 'express';
 import crypto from 'crypto';
-import config from '../configs/config';
 import { useMailer } from '../lib/useMailer';
 import { useResponse } from '../lib/useResponse';
 import { usePassword } from '../lib/usePassword';
 import { useToken } from '../lib/useToken';
 import { useFirebase } from '../lib/useFirebase';
 import { Notification } from '../models/notification.model';
+import { Token } from '../models/token.model';
 
 const controller = {
   create: async ({ body }: Request, res: Response) => {
@@ -41,21 +41,28 @@ const controller = {
       //   },
       // });
 
+      // Create a verification token
+      const verification = new Token({ user: user._id, token: token });
+      await verification.save();
+
       // Create a notification
       const notification = new Notification({
         reference: user._id,
         type: 'SIGN_UP',
         message: 'Welcome to MyMarket...',
       });
+      await notification.save();
 
       return response({
         type: 'SUCCESS',
+        code: 201,
         message: 'Account created successfully',
         data: { email, notification },
       });
     } catch (error) {
       return response({
         type: 'ERROR',
+        code: 500,
         message: (error as Error).message,
       });
     }
@@ -70,8 +77,11 @@ const controller = {
       const { password, email } = body;
 
       // Find user
-      const user = await User.findOne({ email }).select('-password');
+      const user = await User.findOne({ email });
       if (!user) throw new Error('We could not find your account');
+
+      // If user was found, check if user is verified
+      if (!user.isVerified) throw new Error('Your account is not verified');
 
       // If user was found, confirm password is correct
       const passwordMatch = isMatch(password, user.password);
@@ -85,20 +95,22 @@ const controller = {
 
       return response({
         type: 'SUCCESS',
+        code: 200,
         message: 'User authentication successful',
-        data: { user, session: { token, expiresAt } },
+        data: { ...user.toObject(), session: { token, expiresAt } },
       });
     } catch (error) {
       return response({
         type: 'ERROR',
+        code: 500,
         message: (error as Error).message,
       });
     }
   },
 
-  get: async ({ params }: Request, res: Response) => {
+  get: async ({ body }: Request, res: Response) => {
     const { response } = useResponse(res);
-    const { userId } = params;
+    const { userId } = body;
 
     try {
       // Find user
@@ -107,12 +119,14 @@ const controller = {
 
       return response({
         type: 'SUCCESS',
+        code: 200,
         message: 'User verification successful',
         data: user,
       });
     } catch (error) {
       return response({
         type: 'ERROR',
+        code: 500,
         message: (error as Error).message,
       });
     }
@@ -129,21 +143,22 @@ const controller = {
 
       return response({
         type: 'SUCCESS',
+        code: 200,
         message: 'User successfully updated',
         data: user,
       });
     } catch (error) {
       return response({
         type: 'ERROR',
+        code: 500,
         message: (error as Error).message,
       });
     }
   },
 
-  update: async ({ params, body }: Request, res: Response) => {
+  update: async ({ body }: Request, res: Response) => {
     const { response } = useResponse(res);
-    const { password, email, ...payload } = body;
-    const { userId } = params;
+    const { password, email, userId, ...payload } = body;
 
     try {
       // Find user
@@ -152,7 +167,7 @@ const controller = {
 
       // If user was found, update user data
       const updateUser = await User.findByIdAndUpdate(userId, payload);
-      if (updateUser) throw new Error('Unable to update user data');
+      if (!updateUser) throw new Error('Unable to update user data');
 
       return response({
         type: 'SUCCESS',
@@ -163,15 +178,16 @@ const controller = {
     } catch (error) {
       return response({
         type: 'ERROR',
+        code: 500,
         message: (error as Error).message,
       });
     }
   },
 
-  uploadPhoto: async ({ file, params }: Request, res: Response) => {
+  uploadPhoto: async ({ file, body }: Request, res: Response) => {
     const { response } = useResponse(res);
     const { deleteFile, uploadFile, fileName, getUrl } = useFirebase();
-    const { userId } = params;
+    const { userId } = body;
 
     try {
       // Throw an error if file does not exist
@@ -190,7 +206,7 @@ const controller = {
 
       const newPhoto = fileName(file.originalname, userId);
       const uploadedPhoto = await uploadFile(file.buffer, newPhoto, '/photos');
-      const photoUrl = getUrl(uploadedPhoto.ref);
+      const photoUrl = await getUrl(uploadedPhoto.ref);
 
       // store file data
       const savePhoto = await User.findByIdAndUpdate(
@@ -202,12 +218,14 @@ const controller = {
 
       return response({
         type: 'SUCCESS',
+        code: 200,
         message: 'User updated successfully',
         data: savePhoto.photo,
       });
     } catch (error) {
       return response({
         type: 'ERROR',
+        code: 500,
         message: (error as Error).message,
       });
     }
@@ -238,12 +256,14 @@ const controller = {
 
       return response({
         type: 'SUCCESS',
+        code: 200,
         message: 'Email updated successfully',
         data: updateUser.email,
       });
     } catch (error) {
       return response({
         type: 'ERROR',
+        code: 500,
         message: (error as Error).message,
       });
     }
@@ -275,12 +295,14 @@ const controller = {
 
       return response({
         type: 'SUCCESS',
+        code: 200,
         message: 'Password updated successfully',
         data: null,
       });
     } catch (error) {
       return response({
         type: 'ERROR',
+        code: 500,
         message: (error as Error).message,
       });
     }

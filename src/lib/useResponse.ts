@@ -6,14 +6,14 @@ const SUCCESS = 'SUCCESS' as const;
 type ResponseType<S extends typeof ERROR | typeof SUCCESS> = { type: S };
 
 type ResponseProps<T extends unknown> =
-  | (ResponseType<'ERROR'> & { code?: number; message: string })
+  | (ResponseType<'ERROR'> & { code: number; message: string })
   | (ResponseType<'SUCCESS'> & {
       data: T;
-    } & { code?: number; message: string; data: T });
+    } & { code: number; message: string; data: T });
 
 export const useResponse = (res: Response) => {
   const response = <T>(props: ResponseProps<T>) => {
-    const { type, code = res.statusCode, message } = props;
+    const { type, code, message } = props;
 
     //Error response type
     if (props.type === 'ERROR') {

@@ -19,15 +19,15 @@ userRouter.post('/create', validate(Rules.create), controller.create);
 //  Authenticate user
 userRouter.post('/auth', validate(Rules.authenticate), controller.authenticate);
 
-// Get user
-userRouter.get('/:userId/get', authorize, validate(Rules.get), controller.get);
-
 // Verify user
-userRouter.get('/', validate(Rules.verify), controller.verify);
+userRouter.post('/verify', validate(Rules.verify), controller.verify);
+
+// Get user
+userRouter.get('/get', authorize, validate(Rules.get), controller.get);
 
 // Update user
 userRouter.patch(
-  '/:userId/update',
+  '/update',
   authorize,
   validate(Rules.update),
   controller.update
@@ -35,23 +35,23 @@ userRouter.patch(
 
 // Upload photo
 userRouter.post(
-  '/:userId/upload',
+  '/upload',
   authorize,
-  upload.single('photo'),
   validate(Rules.uploadPhoto),
+  upload.single('photo'),
   controller.uploadPhoto
 );
 
 // Change email
 userRouter.post(
-  '/:userId/email/change',
+  '/:userId/change-email',
   validate(Rules.changeEmail),
   controller.changeEmail
 );
 
 // Change password
 userRouter.post(
-  '/:userId/password/change',
+  '/:userId/change-password',
   validate(Rules.changePassword),
   controller.changePassword
 );

@@ -14,6 +14,8 @@ export type UserDoc = Document & {
   bio: string;
   photo: Photo;
   isVerified: boolean;
+  createdAt: Date;
+  updatedAt: Date;
 };
 
 const userSchema = new Schema<UserDoc>(

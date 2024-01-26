@@ -14,25 +14,28 @@ export const controller = {
       // Find a matching token
       const doc = await Token.findOne({ token });
       if (!doc)
-        throw new Error(
-          'we were unable to find your token. Token may have expired'
-        );
+        throw new Error('Unable to find your token. Token may have expired');
 
       // If we found token, find the user
       const user = await User.findById(doc.user);
-      if (!user)
-        throw new Error('We were unable to find a user with the token');
+      if (!user) throw new Error('Unable to find a user with the token');
 
-      // verify and save the user
-      const verified = await User.findByIdAndUpdate(token.user, {
-        isVerified: true,
-      });
+      // Check if the user is not verified
+      if (user.isVerified) throw new Error('Your account has been verified');
+
+      // Verify and save the user
+      const verifyUser = await User.findByIdAndUpdate(
+        user._id,
+        { isVerified: true },
+        { new: true }
+      );
+      if (!verifyUser) throw new Error('Unable to verify the user');
 
       return response({
         type: 'SUCCESS',
         code: 200,
         message: 'The account has been verified. Please log in again',
-        data: verified?.isVerified,
+        data: verifyUser.isVerified,
       });
     } catch (error) {
       return response({
@@ -45,17 +48,21 @@ export const controller = {
 
   resend: async ({ body }: Request, res: Response) => {
     const { response } = useResponse(res);
+    const { email } = body;
 
     try {
-      const { email } = body;
       const hash = crypto.randomBytes(128).toString('hex');
 
+      // Find user
       const user = await User.findOne({ email });
-      if (!user)
-        throw new Error('We were unable to find a user with that email.');
+      if (!user) throw new Error('Unable to find a user with that email.');
+
+      // If user was found, check if the user is verified
+      if (user.isVerified) throw new Error('Your account has been verified');
 
       // Create a verification token
       const token = new Token({ user: user._id, token: hash });
+      await token.save();
       if (!token) throw new Error('Unable to create a token');
 
       return response({
