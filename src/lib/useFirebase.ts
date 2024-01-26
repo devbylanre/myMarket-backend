@@ -1,4 +1,5 @@
 import { initializeApp } from 'firebase/app';
+import crypto from 'crypto';
 import firebaseConfig from '../configs/firebase';
 import {
   StorageReference,
@@ -16,7 +17,8 @@ export const useFirebase = () => {
 
   const fileName = (originalname: string, id: string) => {
     const extension = path.extname(originalname);
-    const name = `${id}-${Date.now()}${extension}`;
+    const hash = crypto.randomBytes(8).toString('hex');
+    const name = `${id}-${hash}${extension}`;
     return name;
   };
 

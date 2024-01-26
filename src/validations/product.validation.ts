@@ -1,52 +1,38 @@
 import { body, param } from 'express-validator';
+import { useValidate } from '../lib/useValidate';
 
-const baseValidation = [
-  body('title', 'Title must be a non-empty string')
-    .optional()
-    .isString()
-    .notEmpty(),
-  body('tagline', 'Tagline must be a non-empty string')
-    .optional()
-    .isString()
-    .notEmpty(),
-  body('description', 'Description must be a non-empty string')
-    .optional()
-    .isString()
-    .notEmpty(),
-  body('brand', 'Brand must be a non-empty string')
-    .optional()
-    .isString()
-    .notEmpty(),
-  body('model', 'Model must be a non-empty string')
-    .optional()
-    .isString()
-    .notEmpty(),
-  body('category', 'Category must be a non-empty string')
-    .optional()
-    .isString()
-    .notEmpty(),
-  body('images', 'Images must be a non-empty array')
-    .optional()
-    .isArray({ min: 1 }),
-  body('tags', 'Tags must be a non-empty array').optional().isArray({ min: 1 }),
-  body('tags.*', 'Each tag must be a non-empty string')
-    .optional()
-    .isString()
-    .notEmpty(),
-  body('price', 'Price must be a numeric value').optional().isNumeric(),
-  body('discount', 'Discount must be a numeric value').optional().isNumeric(),
-  body('user', 'User must be a valid MongoDB ObjectId').optional().isMongoId(),
-];
+const { isString, isMongoId, isNumber } = useValidate();
 
-const validateParam = [
-  param('id', 'Product id must be a valid Object id').isMongoId(),
-];
+const Rules = {
+  create: [
+    isString('title', 'Product title'),
+    isString('tagline', 'Product tagline'),
+    isString('description', 'Product description'),
+    isString('category', 'Product category'),
+    isString('brand', 'Product brand'),
+    isString('model', 'Product model'),
+    isNumber('price', 'Product price'),
+    isNumber('discount', 'Product discount'),
+    isMongoId('body', 'postedBy', 'User'),
+  ],
 
-const rules = {
-  create: baseValidation,
-  update: [...validateParam, ...baseValidation],
-  delete: validateParam,
-  fetch: validateParam,
+  update: [
+    isString('title', 'Product title').optional(),
+    isString('tagline', 'Product tagline').optional(),
+    isString('description', 'Product description').optional(),
+    isString('category', 'Product category').optional(),
+    isString('brand', 'Product brand').optional(),
+    isString('model', 'Product model').optional(),
+    isNumber('price', 'Product price').optional(),
+    isNumber('discount', 'Product discount').optional(),
+    isMongoId('param', 'productId', 'Product'),
+  ],
+
+  delete: [isMongoId('param', 'productId', 'Product')],
+
+  getOne: [isMongoId('param', 'productId', 'Product')],
+
+  getForUser: [isMongoId('param', 'userId', 'Product')],
 };
 
-export { rules };
+export default Rules;

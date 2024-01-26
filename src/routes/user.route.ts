@@ -11,7 +11,7 @@ const { configure } = useUpload();
 const { validate } = useValidate();
 const { authorize } = useAuthorization();
 
-const upload = configure({ fileSize: 2 * 1024 * 1024 });
+const upload = configure({ fileSize: 2 * 1024 * 1024, files: 1 });
 
 // Create new user
 userRouter.post('/create', validate(Rules.create), controller.create);

@@ -44,7 +44,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // routers
 app.use('/user', userRouter);
-app.use('/product', productRouter);
+app.use('/products', productRouter);
 app.use('/otps', otpRouter);
 app.use('/billings', billingRouter);
 app.use('/stores', storeRouter);
