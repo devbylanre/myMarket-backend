@@ -2,57 +2,50 @@ import { useValidate } from '../lib/useValidate';
 
 const { isString, isStrongPassword, isMongoId, isEmail } = useValidate();
 
-const createRoute = [
-  isString('firstName', 'First name'),
-  isString('lastName', 'Last name'),
-  isEmail('email', 'Email address'),
-  isString('bio', 'Bio')
-    .isLength({ max: 256 })
-    .withMessage('Bio cannot exceed 255 characters'),
-  isStrongPassword('password', 'Password'),
-];
+export const Rules = {
+  create: [
+    isString('firstName', 'First name'),
+    isString('lastName', 'Last name'),
+    isEmail('email', 'Email address'),
+    isString('bio', 'Bio')
+      .isLength({ max: 256 })
+      .withMessage('Bio cannot exceed 256 characters'),
+    isStrongPassword('password', 'Password'),
+  ],
 
-const authRoute = [
-  isEmail('email', 'Email'),
-  isStrongPassword('password', 'Password'),
-];
+  authenticate: [
+    isEmail('email', 'Email'),
+    isStrongPassword('password', 'Password'),
+  ],
 
-const getRoute = [isMongoId('param', 'userId', 'User')];
+  get: [isMongoId('param', 'userId', 'User')],
 
-const updateRoute = [isMongoId('param', 'userId', 'User')];
+  verify: [isEmail('email', 'Email address')],
 
-const verifyEmailRoute = [
-  isEmail('email', 'Email'),
-  isString('token', 'Verification token'),
-];
+  update: [
+    isMongoId('param', 'userId', 'User'),
+    isString('firstName', 'First name').optional(),
+    isString('lastName', 'Last name').optional(),
+    isString('bio', 'Bio')
+      .optional()
+      .isLength({ max: 256 })
+      .withMessage('Bio cannot exceed 256 characters'),
+    isStrongPassword('password', 'Password'),
+  ],
 
-const uploadPhotoRoute = [isMongoId('body', 'userId', 'User')];
+  uploadPhoto: [isMongoId('param', 'userId', 'User')],
 
-const changeEmailRoute = [
-  isEmail('oldEmail', ' Old email'),
-  isEmail('newEmail', ' New email'),
-  isStrongPassword('password', 'Password'),
-];
+  changeEmail: [
+    isMongoId('param', 'userId', 'User'),
+    isEmail('Email', ' New email'),
+    isStrongPassword('password', 'Password'),
+  ],
 
-const changePasswordRoute = [
-  isEmail('email', ' Email'),
-  isStrongPassword('oldPassword', 'Old password'),
-  isStrongPassword('newPassword', ' New password'),
-];
-
-const followRoute = [
-  isMongoId('body', 'userId', 'User'),
-  isMongoId('body', 'follower', 'Follower'),
-];
-
-export {
-  createRoute,
-  authRoute,
-  getRoute,
-  updateRoute,
-  verifyEmailRoute,
-  uploadPhotoRoute,
-  changeEmailRoute,
-  changePasswordRoute,
-  followRoute,
+  changePassword: [
+    isMongoId('param', 'userId', 'User'),
+    isStrongPassword('oldPassword', 'Old password'),
+    isStrongPassword('newPassword', ' New password'),
+  ],
 };
+
+export default Rules;

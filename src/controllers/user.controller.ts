@@ -18,20 +18,16 @@ const controller = {
     try {
       const { firstName, lastName, email, password } = body;
       const name = `${firstName} ${lastName}`;
-      const token = crypto.randomBytes(120).toString('hex');
+      const token = crypto.randomBytes(128).toString('hex');
       const encryptedPassword = encrypt(password);
 
-      // Find user with email
+      // Find user
       const existingUser = await User.findOne({ email });
       if (existingUser)
         throw new Error('Email is already registered to another user');
 
       // Register user
-      const user = await User.create({
-        ...body,
-        password: encryptedPassword,
-        token: token,
-      });
+      const user = await User.create({ ...body, password: encryptedPassword });
 
       // Send an Email to the user about successful registration
       // const eMail = await mail({
@@ -54,14 +50,12 @@ const controller = {
 
       return response({
         type: 'SUCCESS',
-        code: 201,
         message: 'Account created successfully',
         data: { email, notification },
       });
     } catch (error) {
       return response({
         type: 'ERROR',
-        code: 500,
         message: (error as Error).message,
       });
     }
@@ -75,68 +69,90 @@ const controller = {
     try {
       const { password, email } = body;
 
-      // find user by email
-      const user = await User.findOne({ email }).select('-_id password');
+      // Find user
+      const user = await User.findOne({ email }).select('-password');
       if (!user) throw new Error('We could not find your account');
 
-      // confirm if password is correct
+      // If user was found, confirm password is correct
       const passwordMatch = isMatch(password, user.password);
       if (!passwordMatch) throw new Error('Invalid password, try again');
 
+      // Create a json web token
       const token = sign({ id: user._id }, '24d');
+
+      // Get json web token expiration date
       const expiresAt = expire(token);
 
       return response({
         type: 'SUCCESS',
-        code: 200,
         message: 'User authentication successful',
         data: { user, session: { token, expiresAt } },
       });
     } catch (error) {
       return response({
         type: 'ERROR',
-        code: 500,
         message: (error as Error).message,
       });
     }
   },
 
-  get: async ({ params: { userId } }: Request, res: Response) => {
+  get: async ({ params }: Request, res: Response) => {
     const { response } = useResponse(res);
-    try {
-      // find user by id
-      const user = await User.findById(userId);
-      if (!user) throw new Error('User account not found');
+    const { userId } = params;
 
-      const { password, ...data } = user.toObject();
+    try {
+      // Find user
+      const user = await User.findById(userId).select('-password');
+      if (!user) throw new Error('User account not found');
 
       return response({
         type: 'SUCCESS',
-        code: 200,
         message: 'User verification successful',
-        data: { ...data },
+        data: user,
       });
     } catch (error) {
       return response({
         type: 'ERROR',
-        code: 500,
         message: (error as Error).message,
       });
     }
   },
 
-  update: async ({ params: { userId }, body }: Request, res: Response) => {
+  verify: async ({ body }: Request, res: Response) => {
     const { response } = useResponse(res);
+    const { email } = body;
 
     try {
-      const { otp, verification, password, email, ...payload } = body;
+      // Find user
+      const user = await User.findOne({ email }).select('-password');
+      if (!user) throw new Error('Unable to find user');
 
-      // find user by id
+      return response({
+        type: 'SUCCESS',
+        message: 'User successfully updated',
+        data: user,
+      });
+    } catch (error) {
+      return response({
+        type: 'ERROR',
+        message: (error as Error).message,
+      });
+    }
+  },
+
+  update: async ({ params, body }: Request, res: Response) => {
+    const { response } = useResponse(res);
+    const { password, email, ...payload } = body;
+    const { userId } = params;
+
+    try {
+      // Find user
       const user = await User.findById(userId);
       if (!user) throw new Error('User account not found');
 
-      // update user data
-      const updatedUser = await User.findByIdAndUpdate(userId, { ...payload });
+      // If user was found, update user data
+      const updateUser = await User.findByIdAndUpdate(userId, payload);
+      if (updateUser) throw new Error('Unable to update user data');
 
       return response({
         type: 'SUCCESS',
@@ -147,124 +163,124 @@ const controller = {
     } catch (error) {
       return response({
         type: 'ERROR',
-        code: 500,
         message: (error as Error).message,
       });
     }
   },
 
-  uploadPhoto: async ({ file, body: { userId } }: Request, res: Response) => {
+  uploadPhoto: async ({ file, params }: Request, res: Response) => {
     const { response } = useResponse(res);
     const { deleteFile, uploadFile, fileName, getUrl } = useFirebase();
+    const { userId } = params;
 
     try {
-      // throe error if no file was uploaded
+      // Throw an error if file does not exist
       if (!file) throw new Error('No file was provided');
 
-      // find user account
+      // Find user
       const user = await User.findById(userId);
       if (!user) throw new Error('User account not found');
 
-      // check if file exists
-      if (user.photo?.name) {
-        const photo = user.photo.name;
-        await deleteFile(photo, '/photos'); // delete photo from storage
+      // Check if a file has been stored
+      const previousPhoto = user.photo.name;
+      if (previousPhoto) {
+        // Delete the store file
+        await deleteFile(previousPhoto, '/photos');
       }
 
-      const photoName = fileName(file.originalname, userId);
-      const photo = await uploadFile(file.buffer, photoName, '/photos');
-      const photoUrl = getUrl(photo.ref);
+      const newPhoto = fileName(file.originalname, userId);
+      const uploadedPhoto = await uploadFile(file.buffer, newPhoto, '/photos');
+      const photoUrl = getUrl(uploadedPhoto.ref);
 
       // store file data
-      const savedPhoto = await User.findByIdAndUpdate(
+      const savePhoto = await User.findByIdAndUpdate(
         userId,
-        { 'photo.name': photoName, 'photo.url': photoUrl },
+        { 'photo.name': newPhoto, 'photo.url': photoUrl },
         { new: true }
       );
+      if (!savePhoto) throw new Error('Unable to save photo');
 
       return response({
         type: 'SUCCESS',
-        code: 200,
         message: 'User updated successfully',
-        data: savedPhoto?.photo,
+        data: savePhoto.photo,
       });
     } catch (error) {
       return response({
         type: 'ERROR',
-        code: 500,
         message: (error as Error).message,
       });
     }
   },
 
-  changeEmail: async ({ body }: Request, res: Response) => {
+  changeEmail: async ({ body, params }: Request, res: Response) => {
     const { response } = useResponse(res);
     const { isMatch } = usePassword();
-    const { oldEmail, newEmail, password } = body;
+    const { email, password } = body;
+    const { userId } = params;
 
     try {
-      // find user by email
-      const user = await User.findOne({ email: oldEmail });
+      // Find user
+      const user = await User.findById(userId);
       if (!user) throw new Error('User account not registered');
 
+      // If user was found, check if password is correct
       const isPasswordValid = isMatch(password, user.password);
       if (!isPasswordValid) throw new Error('Incorrect password, try again');
 
-      const updatedUser = await User.findOneAndUpdate(
-        { email: oldEmail },
-        { email: newEmail },
+      // Update user
+      const updateUser = await User.findById(
+        userId,
+        { email: email },
         { new: true }
       );
+      if (!updateUser) throw new Error('Unable to update user data');
 
       return response({
         type: 'SUCCESS',
-        code: 200,
         message: 'Email updated successfully',
-        data: updatedUser?.email,
+        data: updateUser.email,
       });
     } catch (error) {
       return response({
         type: 'ERROR',
-        code: 500,
         message: (error as Error).message,
       });
     }
   },
 
-  changePassword: async ({ body }: Request, res: Response) => {
+  changePassword: async ({ body, params }: Request, res: Response) => {
     const { response } = useResponse(res);
     const { isMatch, encrypt } = usePassword();
+    const { userId } = params;
+    const { oldPassword, newPassword } = body;
 
     try {
-      const { email, oldPassword, newPassword } = body;
-
-      // find user by email
-      const user = await User.findOne({ email: email });
+      // Find user
+      const user = await User.findById(userId);
       if (!user) throw new Error(`User account not found`);
 
-      // check if password is correct
+      // If user was found, check if password is correct
       const isPasswordValid = isMatch(oldPassword, user.password);
       if (!isPasswordValid) throw new Error('Incorrect password, try again');
 
-      // encrypt new password
+      // Encrypt new password
       const encryptedPassword = encrypt(newPassword);
 
       // store new password
-      const updatedUser = await User.findByIdAndUpdate(
-        { email: email },
-        { password: encryptedPassword }
-      );
+      const updateUser = await User.findByIdAndUpdate(userId, {
+        password: encryptedPassword,
+      });
+      if (!updateUser) throw new Error('Unable to update user data');
 
       return response({
         type: 'SUCCESS',
-        code: 200,
         message: 'Password updated successfully',
-        data: email,
+        data: null,
       });
     } catch (error) {
       return response({
         type: 'ERROR',
-        code: 500,
         message: (error as Error).message,
       });
     }

@@ -2,49 +2,57 @@ import { Router } from 'express';
 import { useUpload } from '../lib/useUpload';
 import { useValidate } from '../lib/useValidate';
 import controller from '../controllers/user.controller';
-import {
-  authRoute,
-  changeEmailRoute,
-  changePasswordRoute,
-  createRoute,
-  getRoute,
-  updateRoute,
-  uploadPhotoRoute,
-  verifyEmailRoute,
-} from '../validations/user.validation';
+import { Rules } from '../validations/user.validation';
+import { useAuthorization } from '../middlewares/useAuth';
 
 const userRouter = Router();
 
-// hooks
 const { configure } = useUpload();
 const { validate } = useValidate();
+const { authorize } = useAuthorization();
 
 const upload = configure({ fileSize: 2 * 1024 * 1024 });
 
-userRouter.post('/create', validate(createRoute), controller.create);
+// Create new user
+userRouter.post('/create', validate(Rules.create), controller.create);
 
-userRouter.post('/auth', validate(authRoute), controller.authenticate);
+//  Authenticate user
+userRouter.post('/auth', validate(Rules.authenticate), controller.authenticate);
 
-userRouter.get('/:userId', validate(getRoute), controller.get);
+// Get user
+userRouter.get('/:userId/get', authorize, validate(Rules.get), controller.get);
 
-userRouter.patch('/:userId', validate(updateRoute), controller.update);
+// Verify user
+userRouter.get('/', validate(Rules.verify), controller.verify);
 
+// Update user
+userRouter.patch(
+  '/:userId/update',
+  authorize,
+  validate(Rules.update),
+  controller.update
+);
+
+// Upload photo
 userRouter.post(
-  '/photo/upload',
+  '/:userId/upload',
+  authorize,
   upload.single('photo'),
-  validate(uploadPhotoRoute),
+  validate(Rules.uploadPhoto),
   controller.uploadPhoto
 );
 
+// Change email
 userRouter.post(
-  '/email/change',
-  validate(changeEmailRoute),
+  '/:userId/email/change',
+  validate(Rules.changeEmail),
   controller.changeEmail
 );
 
+// Change password
 userRouter.post(
-  '/password/change',
-  validate(changePasswordRoute),
+  '/:userId/password/change',
+  validate(Rules.changePassword),
   controller.changePassword
 );
 

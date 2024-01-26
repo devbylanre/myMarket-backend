@@ -1,5 +1,4 @@
 import { Request, Response, NextFunction } from 'express';
-import { Types } from 'mongoose';
 import { useToken } from '../lib/useToken';
 import { useResponse } from '../lib/useResponse';
 
@@ -10,9 +9,10 @@ export const useAuthorization = () => {
 
     try {
       const { headers } = req;
+      // Get bearer token
       const token = headers.authorization?.split(' ')[1];
 
-      // check if token is empty
+      // Check if token was not found
       if (!token) {
         return response({
           type: 'ERROR',
@@ -21,11 +21,12 @@ export const useAuthorization = () => {
         });
       }
 
-      // verify token
+      // Verify token
       const payload = verify(token);
-      req.body.userId = payload.id; // assign payload.id to req.user
+      // Store token within request body
+      req.body.userId = payload.id;
 
-      // go to the next function
+      // Go to next function
       next();
     } catch (error) {
       return response({

@@ -1,43 +1,32 @@
 import { Response } from 'express';
 
-const ERROR = 'ERROR' as const; // error response type
-const SUCCESS = 'SUCCESS' as const; // success response type
+const ERROR = 'ERROR' as const;
+const SUCCESS = 'SUCCESS' as const;
 
-// response type
 type ResponseType<S extends typeof ERROR | typeof SUCCESS> = { type: S };
 
-// other response props
-type Other = {
-  code: number;
-  message: string;
-};
-
-/*
- response props with a typescript type guard to determine the response type, adds an error property if ResponseType is ERROR and data property if ResponseType is SUCCESS
-*/
 type ResponseProps<T extends unknown> =
-  | (ResponseType<'ERROR'> & Other)
+  | (ResponseType<'ERROR'> & { code?: number; message: string })
   | (ResponseType<'SUCCESS'> & {
       data: T;
-    } & Other);
+    } & { code?: number; message: string; data: T });
 
-// hook for handling route response
 export const useResponse = (res: Response) => {
   const response = <T>(props: ResponseProps<T>) => {
-    const { type, code, message } = props;
+    const { type, code = res.statusCode, message } = props;
 
-    // sends response json if response is not successful
+    //Error response type
     if (props.type === 'ERROR') {
-      return res.status(props.code).json({
+      return res.status(code).json({
         code: code,
         status: type.toLowerCase(),
         message: message,
       });
     }
 
-    // send response json if response is successful
+    // Success response type
     if (props.type === 'SUCCESS') {
-      return res.status(props.code).json({
+      return res.status(code).json({
         code: code,
         status: type.toLowerCase(),
         message: message,
