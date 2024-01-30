@@ -8,7 +8,7 @@ export const controller = {
   create: async ({ body }: Request, res: Response) => {
     const { response } = useResponse(res);
     const { generate } = useOTP();
-    const { mail } = useMailer();
+    const { sendMail } = useMailer();
 
     try {
       // payload

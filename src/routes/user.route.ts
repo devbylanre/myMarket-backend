@@ -3,40 +3,26 @@ import { useUpload } from '../lib/useUpload';
 import { useValidate } from '../lib/useValidate';
 import controller from '../controllers/user.controller';
 import { Rules } from '../validations/user.validation';
-import { useAuthorization } from '../middlewares/useAuth';
 
 const userRouter = Router();
 
 const { configure } = useUpload();
 const { validate } = useValidate();
-const { authorize } = useAuthorization();
 
 const upload = configure({ fileSize: 2 * 1024 * 1024, files: 1 });
-
-// Create new user
-userRouter.post('/create', validate(Rules.create), controller.create);
-
-//  Authenticate user
-userRouter.post('/auth', validate(Rules.authenticate), controller.authenticate);
 
 // Verify user
 userRouter.post('/verify', validate(Rules.verify), controller.verify);
 
 // Get user
-userRouter.get('/get', authorize, validate(Rules.get), controller.get);
+userRouter.get('/get', validate(Rules.get), controller.get);
 
 // Update user
-userRouter.patch(
-  '/update',
-  authorize,
-  validate(Rules.update),
-  controller.update
-);
+userRouter.patch('/update', validate(Rules.update), controller.update);
 
 // Upload photo
 userRouter.post(
   '/upload',
-  authorize,
   validate(Rules.uploadPhoto),
   upload.single('photo'),
   controller.uploadPhoto

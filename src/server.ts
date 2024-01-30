@@ -1,6 +1,5 @@
 import express from 'express';
 import config from './configs/config';
-import mongoose from 'mongoose';
 import path from 'path';
 import cors from 'cors';
 
@@ -15,6 +14,7 @@ import pinRouter from './routes/pin.route';
 import communityRouter from './routes/community.route';
 import reviewRouter from './routes/review.route';
 import tokenRouter from './routes/token.route';
+import { connectToDB } from './configs/db';
 
 const app = express();
 
@@ -26,7 +26,7 @@ app.set('view engine', 'ejs');
 // serve ejs files
 app.use(express.static(path.join(__dirname, 'views')));
 
-app.use((req, res, next) => {
+app.use((req, _, next) => {
   console.log(req.path, req.method);
 
   next();
@@ -54,11 +54,9 @@ app.use('/pins', pinRouter);
 app.use('/reviews', reviewRouter);
 app.use('/tokens', tokenRouter);
 
-mongoose
-  .connect('mongodb://127.0.0.1:27017/mymarket')
-  .then(() => {
-    app.listen(config.port, 'localhost', () =>
-      console.log(`Welcome to port ${config.port} John Doe`)
-    );
-  })
-  .catch((err) => console.log(err));
+// Connect to database
+connectToDB('mongodb://127.0.0.1:27017/mymarket', () => {
+  app.listen(config.port, () =>
+    console.log(`PORT: Working on port ${config.port}`)
+  );
+});

@@ -6,7 +6,6 @@ type Photo = {
 };
 
 export type UserDoc = Document & {
-  role: string;
   firstName: string;
   lastName: string;
   email: string;
@@ -15,24 +14,20 @@ export type UserDoc = Document & {
   photo: Photo;
   isVerified: boolean;
   createdAt: Date;
-  updatedAt: Date;
 };
 
-const userSchema = new Schema<UserDoc>(
-  {
-    role: { type: String, default: 'buyer', required: true },
-    firstName: { type: String, required: true },
-    lastName: { type: String, required: true },
-    email: { type: String, required: true, unique: true },
-    password: { type: String, required: true },
-    bio: { type: String, required: true },
-    isVerified: { type: Boolean, required: true, default: false },
-    photo: {
-      name: { type: String, default: '' },
-      url: { type: String, default: '' },
-    },
+const userSchema = new Schema<UserDoc>({
+  firstName: { type: String, required: true },
+  lastName: { type: String, required: true },
+  email: { type: String, required: true, unique: true },
+  password: { type: String, required: true },
+  bio: { type: String, required: true },
+  isVerified: { type: Boolean, required: true, default: false },
+  createdAt: { type: Date, required: true, default: Date.now() },
+  photo: {
+    name: { type: String, default: '' },
+    url: { type: String, default: '' },
   },
-  { timestamps: true }
-);
+});
 
 export const User = mongoose.model<UserDoc>('Users', userSchema);

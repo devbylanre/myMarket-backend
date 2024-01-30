@@ -6,7 +6,7 @@ import { useMailer } from '../lib/useMailer';
 export const controller = {
   create: async ({ body }: Request, res: Response) => {
     const { response } = useResponse(res);
-    const { mail } = useMailer();
+    const { sendMail } = useMailer();
 
     try {
       const { country, state, city, address, userId } = body;
