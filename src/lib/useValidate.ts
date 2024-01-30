@@ -51,7 +51,7 @@ export const useValidate = () => {
   const isStrongPassword = (field: string, label: string) => {
     return body(
       field,
-      `${label} must be at least 8 characters long and contain at least one uppercase, lowercase, and special character`
+      `${label} must be 8 characters long and contain one uppercase, lowercase, and special character`
     )
       .notEmpty()
       .isStrongPassword();

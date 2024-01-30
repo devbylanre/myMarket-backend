@@ -1,8 +1,21 @@
 import { Router } from 'express';
 import { useUpload } from '../lib/useUpload';
 import { useValidate } from '../lib/useValidate';
-import controller from '../controllers/user.controller';
-import { Rules } from '../validations/user.validation';
+import {
+  changeUserEmail,
+  changeUserPassword,
+  getUser,
+  updateUser,
+  uploadUserPhoto,
+} from '../controllers/user.controller';
+import { useAuthorization } from '../middlewares/useAuthorization';
+import {
+  changeEmailRoute,
+  changePasswordRoute,
+  getUserRoute,
+  updateUserRoute,
+  uploadPhotoRoute,
+} from '../validations/user.validation';
 
 const userRouter = Router();
 
@@ -11,35 +24,23 @@ const { validate } = useValidate();
 
 const upload = configure({ fileSize: 2 * 1024 * 1024, files: 1 });
 
-// Verify user
-userRouter.post('/verify', validate(Rules.verify), controller.verify);
+// Use authorization middleware
+const { authorize } = useAuthorization();
+userRouter.use(authorize);
 
-// Get user
-userRouter.get('/get', validate(Rules.get), controller.get);
-
-// Update user
-userRouter.patch('/update', validate(Rules.update), controller.update);
-
-// Upload photo
+userRouter.get('/', validate(getUserRoute), getUser);
+userRouter.patch('/', validate(updateUserRoute), updateUser);
 userRouter.post(
   '/upload',
-  validate(Rules.uploadPhoto),
+  validate(uploadPhotoRoute),
   upload.single('photo'),
-  controller.uploadPhoto
+  uploadUserPhoto
 );
-
-// Change email
+userRouter.post('/change-email', validate(changeEmailRoute), changeUserEmail);
 userRouter.post(
-  '/:userId/change-email',
-  validate(Rules.changeEmail),
-  controller.changeEmail
-);
-
-// Change password
-userRouter.post(
-  '/:userId/change-password',
-  validate(Rules.changePassword),
-  controller.changePassword
+  '/change-password',
+  validate(changePasswordRoute),
+  changeUserPassword
 );
 
 export default userRouter;

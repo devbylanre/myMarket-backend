@@ -18,7 +18,6 @@ const createUser = async ({ body }: Request, res: Response) => {
 
   try {
     const token = crypto.randomBytes(128).toString('hex');
-    console.log(crypto.randomBytes(64).toString('hex'));
     const encryptedPassword = encrypt(password);
 
     // Find user
@@ -48,7 +47,7 @@ const createUser = async ({ body }: Request, res: Response) => {
       type: 'SUCCESS',
       code: 201,
       message: 'Account created successfully',
-      data: { email, notification },
+      data: { email, notification, verification },
     });
   } catch (error) {
     return response({
@@ -79,8 +78,16 @@ const authenticateUser = async ({ body }: Request, res: Response) => {
     if (!passwordMatch) throw new Error('Invalid password, try again');
 
     // Create json web tokens (access and refresh token)
-    const accessToken = generateToken({ user: user._id }, config.accessToken);
-    const refreshToken = generateToken({ user: user._id }, config.refreshToken);
+    const accessToken = generateToken(
+      { userId: user._id },
+      config.accessToken,
+      '15m'
+    );
+    const refreshToken = generateToken(
+      { userId: user._id },
+      config.refreshToken,
+      '14d'
+    );
 
     return response({
       type: 'SUCCESS',
@@ -88,6 +95,19 @@ const authenticateUser = async ({ body }: Request, res: Response) => {
       message: 'User authentication successful',
       data: { user, accessToken, refreshToken },
     });
+  } catch (error) {
+    return response({
+      type: 'ERROR',
+      code: 500,
+      message: (error as Error).message,
+    });
+  }
+};
+
+const destroy = async (req: Request, res: Response) => {
+  const { response } = useResponse(res);
+
+  try {
   } catch (error) {
     return response({
       type: 'ERROR',
@@ -109,14 +129,15 @@ const refreshToken = async ({ body }: Request, res: Response) => {
     // Create a new access token
     const accessToken = generateToken(
       { userId: (result as JwtPayload).userId },
-      config.accessToken
+      config.accessToken,
+      '14d'
     );
 
     return response({
       type: 'SUCCESS',
       code: 201,
       message: 'Token refresh successful',
-      data: accessToken,
+      data: { accessToken },
     });
   } catch (error) {
     return response({
@@ -127,4 +148,4 @@ const refreshToken = async ({ body }: Request, res: Response) => {
   }
 };
 
-export { createUser, authenticateUser, refreshToken };
+export { createUser, authenticateUser, refreshToken, destroy };
