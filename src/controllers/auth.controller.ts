@@ -7,6 +7,8 @@ import { useResponse } from '../lib/useResponse';
 import { useMailer } from '../lib/useMailer';
 import { usePassword } from '../lib/usePassword';
 import { useToken } from '../lib/useToken';
+import config from '../configs/config';
+import { JwtPayload } from 'jsonwebtoken';
 
 const createUser = async ({ body }: Request, res: Response) => {
   const { firstName, lastName, email, password } = body;
@@ -15,7 +17,6 @@ const createUser = async ({ body }: Request, res: Response) => {
   const { response } = useResponse(res);
 
   try {
-    const name = `${firstName} ${lastName}`;
     const token = crypto.randomBytes(128).toString('hex');
     console.log(crypto.randomBytes(64).toString('hex'));
     const encryptedPassword = encrypt(password);
@@ -26,19 +27,22 @@ const createUser = async ({ body }: Request, res: Response) => {
       throw new Error('Email is already registered to another user');
 
     // Register user
-    const user = await User.create({ ...body, password: encryptedPassword });
+    const user = await User.create({
+      firstName,
+      lastName,
+      email,
+      password: encryptedPassword,
+    });
 
     // Create a verification token
-    const verification = new Token({ user: user._id, token: token });
-    await verification.save();
+    const verification = await Token.create({ user: user._id, token: token });
 
     // Create a notification
-    const notification = new Notification({
+    const notification = await Notification.create({
       reference: user._id,
       type: 'SIGN_UP',
       message: 'Welcome to MyMarket...',
     });
-    await notification.save();
 
     return response({
       type: 'SUCCESS',
@@ -58,7 +62,7 @@ const createUser = async ({ body }: Request, res: Response) => {
 const authenticateUser = async ({ body }: Request, res: Response) => {
   const { response } = useResponse(res);
   const { isMatch } = usePassword();
-  const { sign, expire } = useToken();
+  const { generateToken } = useToken();
 
   try {
     const { password, email } = body;
@@ -74,17 +78,15 @@ const authenticateUser = async ({ body }: Request, res: Response) => {
     const passwordMatch = isMatch(password, user.password);
     if (!passwordMatch) throw new Error('Invalid password, try again');
 
-    // Create a json web token
-    const token = sign({ id: user._id }, '24d');
-
-    // Get json web token expiration date
-    const expiresAt = expire(token);
+    // Create json web tokens (access and refresh token)
+    const accessToken = generateToken({ user: user._id }, config.accessToken);
+    const refreshToken = generateToken({ user: user._id }, config.refreshToken);
 
     return response({
       type: 'SUCCESS',
       code: 200,
       message: 'User authentication successful',
-      data: { ...user.toObject(), session: { token, expiresAt } },
+      data: { user, accessToken, refreshToken },
     });
   } catch (error) {
     return response({
@@ -94,3 +96,35 @@ const authenticateUser = async ({ body }: Request, res: Response) => {
     });
   }
 };
+
+const refreshToken = async ({ body }: Request, res: Response) => {
+  const { token } = body;
+  const { response } = useResponse(res);
+  const { verifyToken, generateToken } = useToken();
+
+  try {
+    // Verify the token
+    const result = verifyToken(token, config.refreshToken);
+
+    // Create a new access token
+    const accessToken = generateToken(
+      { userId: (result as JwtPayload).userId },
+      config.accessToken
+    );
+
+    return response({
+      type: 'SUCCESS',
+      code: 201,
+      message: 'Token refresh successful',
+      data: accessToken,
+    });
+  } catch (error) {
+    return response({
+      type: 'ERROR',
+      code: 500,
+      message: (error as Error).message,
+    });
+  }
+};
+
+export { createUser, authenticateUser, refreshToken };

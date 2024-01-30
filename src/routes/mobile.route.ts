@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { controller } from '../controllers/mobile.controller';
-import { useAuthorization } from '../middlewares/useAuth';
+import { useAuthorization } from '../middlewares/useAuthorization';
 
 const mobileRouter = Router();
 

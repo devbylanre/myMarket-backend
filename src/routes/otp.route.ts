@@ -2,7 +2,7 @@ import { NextFunction, Request, Response, Router } from 'express';
 import { controller } from '../controllers/otp.controller';
 import { useValidate } from '../lib/useValidate';
 import { createRoute, validateRoute } from '../validations/otp.validation';
-import { useAuthorization } from '../middlewares/useAuth';
+import { useAuthorization } from '../middlewares/useAuthorization';
 
 const otpRouter = Router();
 

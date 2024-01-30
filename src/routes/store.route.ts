@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { controller } from '../controllers/store.controller';
-import { useAuthorization } from '../middlewares/useAuth';
+import { useAuthorization } from '../middlewares/useAuthorization';
 
 const storeRouter = Router();
 const { authorize } = useAuthorization();

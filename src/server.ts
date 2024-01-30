@@ -15,6 +15,7 @@ import communityRouter from './routes/community.route';
 import reviewRouter from './routes/review.route';
 import tokenRouter from './routes/token.route';
 import { connectToDB } from './configs/db';
+import authRouter from './routes/auth.route';
 
 const app = express();
 
@@ -43,6 +44,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // routers
+app.use('/auth', authRouter);
 app.use('/user', userRouter);
 app.use('/products', productRouter);
 app.use('/otps', otpRouter);

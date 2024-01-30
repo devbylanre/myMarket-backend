@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { controller } from '../controllers/product.controller';
-import { useAuthorization } from '../middlewares/useAuth';
+import { useAuthorization } from '../middlewares/useAuthorization';
 import { useUpload } from '../lib/useUpload';
 import { useValidate } from '../lib/useValidate';
 import Rules from '../validations/product.validation';
