@@ -5,7 +5,7 @@ export type BillingDoc = Document & {
   state: string;
   city: string;
   address: string;
-  reference: Types.ObjectId;
+  user: Types.ObjectId;
 };
 
 const BillingSchema = new Schema<BillingDoc>({
@@ -13,7 +13,7 @@ const BillingSchema = new Schema<BillingDoc>({
   state: { type: String, required: true },
   city: { type: String, required: true },
   address: { type: String, required: true },
-  reference: { type: Schema.Types.ObjectId, required: true, ref: 'Users' },
+  user: { type: Schema.Types.ObjectId, required: true, ref: 'Users' },
 });
 
 export const Billing = mongoose.model<BillingDoc>('Billings', BillingSchema);

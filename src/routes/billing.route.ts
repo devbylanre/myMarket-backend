@@ -1,15 +1,21 @@
 import { Router } from 'express';
-import { controller } from '../controllers/billing.controller';
+import {
+  createBilling,
+  getBilling,
+  updateBilling,
+  deleteBilling,
+} from '../controllers/billing.controller';
 import { useAuthorization } from '../middlewares/useAuthorization';
 
 const billingRouter = Router();
 
+// Authorize requests
 const { authorize } = useAuthorization();
+billingRouter.use(authorize);
 
-billingRouter.post('/', authorize, controller.create);
-
-billingRouter.get('/:reference/get', authorize, controller.get);
-
-billingRouter.delete('/:reference/delete', authorize, controller.delete);
+billingRouter.post('/', authorize, createBilling);
+billingRouter.get('/', authorize, getBilling);
+billingRouter.patch('/', updateBilling);
+billingRouter.delete('/', authorize, deleteBilling);
 
 export default billingRouter;
